@@ -120,7 +120,7 @@ export class WorkspaceContext {
   async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
-      void vscode.window.showWarningMessage(`Hivey Forge : ${rel} est exclu par la politique de confidentialité et ne sera pas joint.`);
+      void vscode.window.showWarningMessage(`Forge : ${rel} est exclu par la politique de confidentialité et ne sera pas joint.`);
       return undefined;
     }
     const doc = await vscode.workspace.openTextDocument(uri);

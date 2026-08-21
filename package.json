@@ -1,13 +1,13 @@
 {
-  "name": "hivey-forge",
-  "displayName": "Hivey Forge",
+  "name": "forge",
+  "displayName": "Forge",
   "description": "Assistant de code souverain pour VS Code — modèles locaux ou OpenRouter, anonymisation des données avant tout envoi, zéro télémétrie.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "hivey",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FlorianMartins/hivey-forge.git"
+    "url": "https://github.com/FlorianMartins/forge.git"
   },
   "engines": {
     "vscode": "^1.90.0",
@@ -36,16 +36,16 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "hiveyForge",
-          "title": "Hivey Forge",
+          "id": "forge",
+          "title": "Forge",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "hiveyForge": [
+      "forge": [
         {
-          "id": "hiveyForge.chat",
+          "id": "forge.chat",
           "name": "Discussion",
           "type": "webview"
         }
@@ -53,156 +53,179 @@
     },
     "commands": [
       {
-        "command": "hiveyForge.newSession",
+        "command": "forge.newSession",
         "title": "Nouvelle discussion",
-        "category": "Hivey Forge",
+        "category": "Forge",
         "icon": "$(add)"
       },
       {
-        "command": "hiveyForge.askAboutSelection",
+        "command": "forge.askAboutSelection",
         "title": "Interroger la sélection",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.showEgress",
+        "command": "forge.showEgress",
         "title": "Aperçu des données sortantes",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.showCosts",
+        "command": "forge.showCosts",
         "title": "Coûts et budget",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.toggleCompletions",
+        "command": "forge.toggleCompletions",
         "title": "Activer/désactiver la complétion inline",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.setApiKey",
+        "command": "forge.setApiKey",
         "title": "Enregistrer une clé de fournisseur",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.clearApiKey",
+        "command": "forge.clearApiKey",
         "title": "Effacer une clé de fournisseur",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.pickModel",
-        "title": "Choisir le modèle de discussion",
-        "category": "Hivey Forge"
-      },
-      {
-        "command": "hiveyForge.indexWorkspace",
+        "command": "forge.indexWorkspace",
         "title": "Réindexer l'espace de travail",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.editSelection",
+        "command": "forge.editSelection",
         "title": "Modifier la sélection avec l'IA",
-        "category": "Hivey Forge",
+        "category": "Forge",
         "icon": "$(sparkle)"
       },
       {
-        "command": "hiveyForge.generateCommitMessage",
+        "command": "forge.generateCommitMessage",
         "title": "Rédiger le message de commit",
-        "category": "Hivey Forge",
+        "category": "Forge",
         "icon": "$(sparkle)"
       },
       {
-        "command": "hiveyForge.explainTerminalSelection",
+        "command": "forge.explainTerminalSelection",
         "title": "Expliquer la sortie du terminal",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.openTerminal",
+        "command": "forge.openTerminal",
         "title": "Ouvrir Forge dans le terminal",
-        "category": "Hivey Forge",
+        "category": "Forge",
         "icon": "$(terminal)"
       },
       {
-        "command": "hiveyForge.fixDiagnostic",
+        "command": "forge.fixDiagnostic",
         "title": "Corriger ce problème",
-        "category": "Hivey Forge"
+        "category": "Forge"
       },
       {
-        "command": "hiveyForge.explainDiagnostic",
+        "command": "forge.explainDiagnostic",
         "title": "Expliquer ce problème",
-        "category": "Hivey Forge"
+        "category": "Forge"
+      },
+      {
+        "command": "forge.showHistory",
+        "title": "Historique des conversations",
+        "category": "Forge",
+        "icon": "$(history)"
+      },
+      {
+        "command": "forge.showModels",
+        "title": "Choisir le modèle (comparer les prix)",
+        "category": "Forge",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "forge.showPermissions",
+        "title": "Permissions de l'agent",
+        "category": "Forge",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "forge.pickCompletionModel",
+        "title": "Choisir le modèle de complétion",
+        "category": "Forge"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "hiveyForge.newSession",
-          "when": "view == hiveyForge.chat",
-          "group": "navigation"
+          "command": "forge.newSession",
+          "when": "view == forge.chat",
+          "group": "navigation@1"
         },
         {
-          "command": "hiveyForge.openTerminal",
-          "when": "view == hiveyForge.chat",
-          "group": "navigation"
+          "command": "forge.showHistory",
+          "when": "view == forge.chat",
+          "group": "navigation@2"
+        },
+        {
+          "command": "forge.openTerminal",
+          "when": "view == forge.chat",
+          "group": "navigation@3"
         }
       ],
       "editor/context": [
         {
-          "command": "hiveyForge.askAboutSelection",
+          "command": "forge.askAboutSelection",
           "when": "editorHasSelection",
-          "group": "hivey@1"
+          "group": "forge@1"
         },
         {
-          "command": "hiveyForge.editSelection",
+          "command": "forge.editSelection",
           "when": "editorTextFocus",
-          "group": "hivey@2"
+          "group": "forge@2"
         }
       ],
       "scm/title": [
         {
-          "command": "hiveyForge.generateCommitMessage",
+          "command": "forge.generateCommitMessage",
           "when": "scmProvider == git",
           "group": "navigation"
         }
       ],
       "terminal/context": [
         {
-          "command": "hiveyForge.explainTerminalSelection",
-          "group": "hivey@1"
+          "command": "forge.explainTerminalSelection",
+          "group": "forge@1"
         }
       ],
       "commandPalette": [
         {
-          "command": "hiveyForge.fixDiagnostic",
+          "command": "forge.fixDiagnostic",
           "when": "false"
         },
         {
-          "command": "hiveyForge.explainDiagnostic",
+          "command": "forge.explainDiagnostic",
           "when": "false"
         },
         {
-          "command": "hiveyForge.askWith",
+          "command": "forge.askWith",
           "when": "false"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "hiveyForge.editSelection",
+        "command": "forge.editSelection",
         "key": "ctrl+i",
         "mac": "cmd+i",
         "when": "editorTextFocus"
       },
       {
-        "command": "hiveyForge.askAboutSelection",
+        "command": "forge.askAboutSelection",
         "key": "ctrl+alt+i",
         "mac": "cmd+alt+i",
         "when": "editorTextFocus"
       }
     ],
     "configuration": {
-      "title": "Hivey Forge",
+      "title": "Forge",
       "properties": {
-        "hiveyForge.chat.provider": {
+        "forge.chat.provider": {
           "type": "string",
           "enum": [
             "local",
@@ -213,12 +236,12 @@
           "default": "local",
           "markdownDescription": "Fournisseur du modèle de **discussion**. `local` = Ollama / LM Studio / llama.cpp sur votre machine ou votre serveur : aucune donnée ne quitte le réseau."
         },
-        "hiveyForge.chat.model": {
+        "forge.chat.model": {
           "type": "string",
           "default": "qwen2.5-coder:7b",
           "description": "Identifiant du modèle de discussion."
         },
-        "hiveyForge.completion.provider": {
+        "forge.completion.provider": {
           "type": "string",
           "enum": [
             "local",
@@ -229,52 +252,52 @@
           "default": "local",
           "markdownDescription": "Fournisseur de la **complétion inline**. Garder `local` : c'est le poste de dépense n°1 chez les concurrents (une requête par frappe)."
         },
-        "hiveyForge.completion.model": {
+        "forge.completion.model": {
           "type": "string",
           "default": "qwen2.5-coder:7b",
           "description": "Modèle de complétion (doit supporter le remplissage au milieu / FIM)."
         },
-        "hiveyForge.completion.enabled": {
+        "forge.completion.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Proposer des complétions pendant la frappe."
         },
-        "hiveyForge.completion.debounceMs": {
+        "forge.completion.debounceMs": {
           "type": "number",
           "default": 220,
           "description": "Délai d'inactivité avant de demander une complétion."
         },
-        "hiveyForge.completion.maxTokens": {
+        "forge.completion.maxTokens": {
           "type": "number",
           "default": 128,
           "description": "Longueur maximale d'une complétion."
         },
-        "hiveyForge.completion.multiline": {
+        "forge.completion.multiline": {
           "type": "boolean",
           "default": true,
           "description": "Autoriser les complétions sur plusieurs lignes."
         },
-        "hiveyForge.endpoints.local": {
+        "forge.endpoints.local": {
           "type": "string",
           "default": "http://127.0.0.1:11434/v1",
           "description": "URL du serveur local compatible OpenAI (Ollama : .../v1, LM Studio : http://127.0.0.1:1234/v1, vLLM, llama.cpp…)."
         },
-        "hiveyForge.endpoints.openaiCompatible": {
+        "forge.endpoints.openaiCompatible": {
           "type": "string",
           "default": "",
           "description": "URL d'une passerelle interne compatible OpenAI (proxy d'entreprise, Azure, LiteLLM…)."
         },
-        "hiveyForge.endpoints.openrouter": {
+        "forge.endpoints.openrouter": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
           "description": "URL de base OpenRouter."
         },
-        "hiveyForge.endpoints.anthropic": {
+        "forge.endpoints.anthropic": {
           "type": "string",
           "default": "https://api.anthropic.com/v1",
           "description": "URL de base Anthropic."
         },
-        "hiveyForge.privacy.redaction": {
+        "forge.privacy.redaction": {
           "type": "string",
           "enum": [
             "strict",
@@ -284,12 +307,12 @@
           "default": "strict",
           "markdownDescription": "Anonymisation avant tout envoi **distant** :\n- `strict` : secrets, identités, machines, chemins, URL internes, adresses IP — pseudonymisés de façon réversible.\n- `balanced` : secrets et identités seulement.\n- `off` : aucune (déconseillé, exige `privacy.allowUnredacted`)."
         },
-        "hiveyForge.privacy.allowUnredacted": {
+        "forge.privacy.allowUnredacted": {
           "type": "boolean",
           "default": false,
           "description": "Autorise réellement le mode « off ». Sans cette case, « off » retombe sur « balanced »."
         },
-        "hiveyForge.privacy.blockedGlobs": {
+        "forge.privacy.blockedGlobs": {
           "type": "array",
           "items": {
             "type": "string"
@@ -307,7 +330,7 @@
           ],
           "description": "Fichiers qui ne partent JAMAIS vers un fournisseur distant, quoi qu'il arrive."
         },
-        "hiveyForge.privacy.egressPolicy": {
+        "forge.privacy.egressPolicy": {
           "type": "string",
           "enum": [
             "ask-once",
@@ -317,32 +340,32 @@
           "default": "ask-once",
           "description": "Confirmation avant le premier envoi distant d'une session (ask-once), avant chaque envoi (ask-always), ou jamais (trust)."
         },
-        "hiveyForge.privacy.auditLog": {
+        "forge.privacy.auditLog": {
           "type": "boolean",
           "default": true,
           "description": "Journaliser localement chaque envoi distant (horodatage, fournisseur, modèle, empreinte, jetons, coût). Aucun contenu."
         },
-        "hiveyForge.budget.perRequestUsd": {
+        "forge.budget.perRequestUsd": {
           "type": "number",
           "default": 0.25,
           "description": "Coût estimé maximal d'une requête distante. Au-delà, la requête est refusée."
         },
-        "hiveyForge.budget.dailyUsd": {
+        "forge.budget.dailyUsd": {
           "type": "number",
           "default": 2,
           "description": "Plafond de dépense distante par jour. 0 = illimité."
         },
-        "hiveyForge.context.maxTokens": {
+        "forge.context.maxTokens": {
           "type": "number",
           "default": 8000,
           "description": "Budget de contexte envoyé au modèle (carte du dépôt + extraits)."
         },
-        "hiveyForge.context.repoMap": {
+        "forge.context.repoMap": {
           "type": "boolean",
           "default": true,
           "description": "Joindre une carte des symboles du dépôt plutôt que des fichiers entiers."
         },
-        "hiveyForge.privacy.customTerms": {
+        "forge.privacy.customTerms": {
           "type": "array",
           "items": {
             "type": "string"
@@ -350,7 +373,7 @@
           "default": [],
           "description": "Mots propres à l'organisation à toujours remplacer avant un envoi distant : noms de clients, de projets, de marques internes."
         },
-        "hiveyForge.escalation.policy": {
+        "forge.escalation.policy": {
           "type": "string",
           "enum": [
             "never",
@@ -360,7 +383,7 @@
           "default": "ask",
           "markdownDescription": "Quand le modèle local ne suffit pas (contexte trop grand, question de diagnostic ou d'architecture) : `never` refuse, `ask` propose, `auto` bascule seul vers le modèle d'escalade."
         },
-        "hiveyForge.escalation.provider": {
+        "forge.escalation.provider": {
           "type": "string",
           "enum": [
             "openrouter",
@@ -370,7 +393,7 @@
           "default": "openrouter",
           "description": "Fournisseur utilisé lors d'une escalade."
         },
-        "hiveyForge.escalation.model": {
+        "forge.escalation.model": {
           "type": "string",
           "default": "",
           "description": "Modèle d'escalade (vide = pas d'escalade possible)."
@@ -383,7 +406,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
-    "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-forge.vsix",
+    "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o forge.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
     "scan:secrets": "node scripts/scan-secrets.mjs",

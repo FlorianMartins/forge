@@ -105,6 +105,17 @@ export class OpenAICompatibleProvider implements Provider {
         function: { name: t.name, description: t.description, parameters: t.parameters },
       }));
     }
+    // Reasoning. OpenRouter normalises it under `reasoning`; OpenAI's own API and several
+    // gateways take `reasoning_effort`. Sending both is safe: an unknown field is dropped, and a
+    // server that knows one of them gets the intent.
+    if (req.reasoning && req.reasoning !== "none") {
+      if (this.id === "openrouter") body["reasoning"] = { effort: req.reasoning };
+      else body["reasoning_effort"] = req.reasoning;
+    } else if (req.reasoning === "none" && this.id === "openrouter") {
+      // Explicitly off, so a model that thinks by default does not bill for it.
+      body["reasoning"] = { exclude: true };
+    }
+
     // Ask for the accounting. OpenAI-compatible servers that do not know the field ignore it.
     body["stream_options"] = { include_usage: true };
     if (this.id === "openrouter") body["usage"] = { include: true };
@@ -281,7 +292,7 @@ export async function describeHttpError(res: Response): Promise<string> {
   }
   const hint =
     res.status === 401 || res.status === 403
-      ? " — check the API key (Hivey Forge: “Enregistrer une clé de fournisseur”)."
+      ? " — check the API key (Forge: “Enregistrer une clé de fournisseur”)."
       : res.status === 404
         ? " — check the endpoint URL and that the model exists on it."
         : res.status === 429

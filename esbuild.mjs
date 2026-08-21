@@ -85,4 +85,4 @@ for (const t of targets) {
     await build(t);
   }
 }
-if (watch) console.log("[hivey-forge] veille active");
+if (watch) console.log("[forge] veille active");

@@ -13,7 +13,7 @@ import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
 import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 
-export const SECTION = "hiveyForge";
+export const SECTION = "forge";
 
 export interface Settings {
   chat: { provider: ProviderId; model: string };
@@ -127,7 +127,7 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   const local = isLocalEndpoint(baseUrl);
   const apiKey = local && id === "local" ? undefined : await keys.get(id);
   if (!local && !apiKey && id !== "openai-compatible") {
-    throw new Error(`No API key stored for “${id}”. Run “Hivey Forge: Enregistrer une clé de fournisseur”.`);
+    throw new Error(`No API key stored for “${id}”. Run “Forge: Enregistrer une clé de fournisseur”.`);
   }
   return makeProvider({ id, baseUrl, apiKey });
 }

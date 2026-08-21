@@ -2,18 +2,25 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
-## Fait (0.1.0)
+## Fait (0.2.0)
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion,
   session, carte du dépôt, boucle d'agent. **95 tests**, dont des tests de protocole contre un vrai
   serveur HTTP et quatre tests bout-en-bout du client terminal.
-- Barre latérale : streaming, mode agent avec approbation par action, pièces jointes, historique,
+- Barre latérale refondue (langage visuel de VS Code, zéro couleur propre) : quatre écrans —
+  conversation, historique, modèles, permissions —, sélecteur de mode (discussion / plan / agent),
+  réglage du raisonnement, menu de contexte (fichier actif, onglets ouverts, import disque,
+  sélecteur `#`), recherche dans la conversation et dans l'historique, filtres d'historique,
   échanges muets / épinglés / modifiables / supprimables, compteurs de contexte et de coût.
+- Permissions de l'agent : « une fois », « cette conversation », « toujours », « jamais », par
+  forme d'action ; un refus l'emporte toujours.
+- Comparateur de modèles : 411 modèles avec prix d'entrée, de sortie, de cache et fenêtre de
+  contexte, plus ce que le point de terminaison local sert réellement.
 - Complétion inline FIM, anti-rebond, cache « frappe à travers », préchauffage du modèle.
 - Commandes d'éditeur : `Ctrl+I`, interroger la sélection, message de commit, expliquer le terminal.
 - Client terminal `forge`, avec sortie de commande capturée et diff avant écriture.
 - Porte de sortie : globs interdits, anonymisation, refus sur secret, consentement, journal, budget.
-- Correctifs rapides sur les diagnostics de l'éditeur (« Corriger avec Hivey Forge »), commandes
+- Correctifs rapides sur les diagnostics de l'éditeur (« Corriger avec Forge »), commandes
   `/` dans la barre latérale, mention `#` qui ouvre le sélecteur de fichiers de VS Code, et
   lancement du client terminal depuis l'éditeur.
 - **Tests d'intégration dans un vrai VS Code** (7, headless) : l'extension s'active, toutes les

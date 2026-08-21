@@ -14,7 +14,7 @@ import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const log = vscode.window.createOutputChannel("Hivey Forge");
+  const log = vscode.window.createOutputChannel("Forge");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
   const workspace = new WorkspaceContext(disposables);
@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ...disposables,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, chat, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.languages.registerInlineCompletionItemProvider({ pattern: "**" }, completion),
-    vscode.workspace.registerTextDocumentContentProvider("hivey-forge-preview", new PreviewProvider()),
+    vscode.workspace.registerTextDocumentContentProvider("forge-preview", new PreviewProvider()),
 
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration(SECTION)) return;
@@ -43,17 +43,17 @@ export function activate(context: vscode.ExtensionContext): void {
       completion.updateStatus(s);
     }),
 
-    vscode.commands.registerCommand("hiveyForge.newSession", () => chat.newSession()),
-    vscode.commands.registerCommand("hiveyForge.completionAccepted", () => completion.noteAccepted()),
+    vscode.commands.registerCommand("forge.newSession", () => chat.newSession()),
+    vscode.commands.registerCommand("forge.completionAccepted", () => completion.noteAccepted()),
 
-    vscode.commands.registerCommand("hiveyForge.toggleCompletions", async () => {
+    vscode.commands.registerCommand("forge.toggleCompletions", async () => {
       const config = vscode.workspace.getConfiguration(SECTION);
       const next = !config.get<boolean>("completion.enabled", true);
       await config.update("completion.enabled", next, vscode.ConfigurationTarget.Global);
       completion.updateStatus(readSettings());
     }),
 
-    vscode.commands.registerCommand("hiveyForge.setApiKey", async () => {
+    vscode.commands.registerCommand("forge.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
           { label: "openrouter", detail: "Passerelle multi-modèles" },
@@ -72,10 +72,10 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!key) return;
       await keys.store(provider.label as never, key);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(`Hivey Forge : clé ${provider.label} enregistrée dans le trousseau.`);
+      void vscode.window.showInformationMessage(`Forge : clé ${provider.label} enregistrée dans le trousseau.`);
     }),
 
-    vscode.commands.registerCommand("hiveyForge.clearApiKey", async () => {
+    vscode.commands.registerCommand("forge.clearApiKey", async () => {
       const provider = await vscode.window.showQuickPick(["openrouter", "anthropic", "openai-compatible", "local"], {
         placeHolder: "Quelle clé effacer ?",
       });
@@ -85,43 +85,44 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage(`Clé ${provider} effacée.`);
     }),
 
-    vscode.commands.registerCommand("hiveyForge.pickModel", async () => {
+    // The chat model is chosen in the panel, where prices can be compared side by side; this
+    // command survives for muscle memory and opens that screen.
+    vscode.commands.registerCommand("forge.pickModel", () => chat.show("models")),
+
+    // The completion model is a different decision — it is asked on every pause in typing — and a
+    // quick pick over what the endpoint actually serves is the right shape for it.
+    vscode.commands.registerCommand("forge.pickCompletionModel", async () => {
       const s = readSettings();
-      const which = await vscode.window.showQuickPick(
-        [
-          { label: "Discussion", target: "chat" as const, description: s.chat.model },
-          { label: "Complétion inline", target: "completion" as const, description: s.completion.model },
-        ],
-        { placeHolder: "Quel rôle ?" },
-      );
-      if (!which) return;
-      const id = which.target === "chat" ? s.chat.provider : s.completion.provider === "off" ? "local" : s.completion.provider;
+      const id = s.completion.provider === "off" ? "local" : s.completion.provider;
       let models: string[] = [];
       try {
         const provider = await providerFor(s, keys, id);
         models = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: `Hivey Forge : liste des modèles de ${id}…` },
+          { location: vscode.ProgressLocation.Notification, title: `Forge : modèles servis par ${id}…` },
           () => provider.listModels(),
         );
       } catch (err) {
         void vscode.window.showErrorMessage(`Impossible de lister les modèles : ${(err as Error).message}`);
         return;
       }
-      const picked = await vscode.window.showQuickPick(models, { placeHolder: `Modèle pour ${which.label.toLowerCase()}` });
+      const picked = await vscode.window.showQuickPick(models, {
+        placeHolder: "Modèle de complétion inline — un modèle de code, capable de remplissage au milieu",
+      });
       if (!picked) return;
-      await vscode.workspace
-        .getConfiguration(SECTION)
-        .update(`${which.target}.model`, picked, vscode.ConfigurationTarget.Workspace);
+      await vscode.workspace.getConfiguration(SECTION).update("completion.model", picked, vscode.ConfigurationTarget.Workspace);
       completion.invalidateProvider();
       completion.updateStatus(readSettings());
     }),
 
-    vscode.commands.registerCommand("hiveyForge.showEgress", () => showEgressReport(gate, readSettings())),
-    vscode.commands.registerCommand("hiveyForge.showCosts", () => showCostReport(gate, readSettings())),
+    vscode.commands.registerCommand("forge.showHistory", () => chat.show("history")),
+    vscode.commands.registerCommand("forge.showModels", () => chat.show("models")),
+    vscode.commands.registerCommand("forge.showPermissions", () => chat.show("permissions")),
+    vscode.commands.registerCommand("forge.showEgress", () => showEgressReport(gate, readSettings())),
+    vscode.commands.registerCommand("forge.showCosts", () => showCostReport(gate, readSettings())),
 
-    vscode.commands.registerCommand("hiveyForge.indexWorkspace", async () => {
+    vscode.commands.registerCommand("forge.indexWorkspace", async () => {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Hivey Forge : cartographie du dépôt…" },
+        { location: vscode.ProgressLocation.Notification, title: "Forge : cartographie du dépôt…" },
         async () => {
           workspace.invalidate();
           const map = await workspace.repoMap(readSettings().context.maxTokens, true);
@@ -161,13 +162,13 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
     `[activation] discussion=${s.chat.provider} (${chatUrl || "non configuré"}, ${local ? "local" : "distant"}) ` +
       `complétion=${s.completion.provider} anonymisation=${s.privacy.redaction}`,
   );
-  const KEY = "hiveyForge.announced";
+  const KEY = "forge.announced";
   if (context.globalState.get<boolean>(KEY)) return;
   await context.globalState.update(KEY, true);
   const choice = await vscode.window.showInformationMessage(
     local
-      ? "Hivey Forge est actif. Tout reste sur votre machine : la complétion et la discussion parlent à votre serveur local."
-      : `Hivey Forge est actif. La discussion utilise ${safeHost(chatUrl)} ; ce qui sort est anonymisé et vous sera montré avant le premier envoi.`,
+      ? "Forge est actif. Tout reste sur votre machine : la complétion et la discussion parlent à votre serveur local."
+      : `Forge est actif. La discussion utilise ${safeHost(chatUrl)} ; ce qui sort est anonymisé et vous sera montré avant le premier envoi.`,
     "Ouvrir les réglages",
     "Compris",
   );

@@ -7,7 +7,7 @@
 // honest test of whether the core really is editor-agnostic — if something only works in the
 // sidebar, it was in the wrong place.
 //
-// Configuration comes from `.hivey-forge.json` (working directory, then home) and from the
+// Configuration comes from `.forge.json` (working directory, then home) and from the
 // environment, so a team can commit a shared configuration without committing a key.
 
 import { createInterface, type Interface } from "node:readline/promises";
@@ -25,7 +25,7 @@ import { GENERATED_PRICES } from "../core/router/catalog.generated.js";
 import { Session } from "../core/session/session.js";
 import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
-import { AGENT_PROMPT, SYSTEM_PROMPT } from "../core/prompts.js";
+import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -37,19 +37,20 @@ interface CliConfig {
   blockedGlobs: string[];
   budget: { perRequestUsd: number; dailyUsd: number };
   contextTokens: number;
-  agent: boolean;
+  /** Which mode the client starts in — the same three the sidebar offers. */
+  mode: Mode;
 }
 
 const DEFAULTS: CliConfig = {
   provider: "local",
-  model: process.env["HIVEY_FORGE_MODEL"] ?? "qwen2.5-coder:7b",
-  baseUrl: process.env["HIVEY_FORGE_URL"] ?? "http://127.0.0.1:11434/v1",
+  model: process.env["FORGE_MODEL"] ?? "qwen2.5-coder:7b",
+  baseUrl: process.env["FORGE_URL"] ?? "http://127.0.0.1:11434/v1",
   redaction: "strict",
   customTerms: [],
   blockedGlobs: ["**/.env*", "**/*.pem", "**/*.key", "**/id_rsa*", "**/secrets/**", "**/.aws/**", "**/.ssh/**"],
   budget: { perRequestUsd: 0.25, dailyUsd: 2 },
   contextTokens: 8000,
-  agent: true,
+  mode: "agent",
 };
 
 const C = {
@@ -62,7 +63,7 @@ const C = {
 
 async function loadConfig(cwd: string): Promise<CliConfig> {
   const merged: CliConfig = { ...DEFAULTS };
-  for (const path of [join(homedir(), ".hivey-forge.json"), join(cwd, ".hivey-forge.json")]) {
+  for (const path of [join(homedir(), ".forge.json"), join(cwd, ".forge.json")]) {
     try {
       Object.assign(merged, JSON.parse(await readFile(path, "utf8")));
     } catch {
@@ -96,23 +97,23 @@ class FileSpendStore implements SpendStore {
 async function main(): Promise<void> {
   const cwd = process.cwd();
   const cfg = await loadConfig(cwd);
-  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env["HIVEY_FORGE_KEY"];
+  const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : process.env["FORGE_KEY"];
   const isLocal = isLocalEndpoint(cfg.baseUrl);
   const provider = makeProvider({ id: cfg.provider, baseUrl: cfg.baseUrl, apiKey });
 
-  const store = new FileSpendStore(join(homedir(), ".hivey-forge", "spend.json"));
+  const store = new FileSpendStore(join(homedir(), ".forge", "spend.json"));
   store.load();
   const budget = new Budget(store, cfg.budget);
   const prices = makeLookup(GENERATED_PRICES);
   const session = new Session();
-  let agentMode = cfg.agent;
+  let mode: Mode = cfg.mode;
 
   const rl: Interface = createInterface({ input: stdin, output: stdout });
 
-  console.log(C.bold("Hivey Forge") + C.dim(" — assistant de code souverain"));
+  console.log(C.bold("Forge") + C.dim(" — assistant de code souverain"));
   console.log(
     C.dim(
-      `${cfg.model} via ${new URL(cfg.baseUrl).host} · ${isLocal ? C.green("local (coût nul)") : C.amber(`distant, anonymisation ${cfg.redaction}`)}`,
+      `${cfg.model} via ${new URL(cfg.baseUrl).host} · mode ${cfg.mode} · ${isLocal ? C.green("local (coût nul)") : C.amber(`distant, anonymisation ${cfg.redaction}`)}`,
     ),
   );
   console.log(C.dim("/aide pour les commandes, Ctrl+C pour quitter.\n"));
@@ -155,7 +156,7 @@ async function main(): Promise<void> {
             "/muet <n>        retirer l'échange n du contexte (il reste affiché)",
             "/rendre <n>      le remettre",
             "/oublier <n>     le supprimer définitivement",
-            "/agent           basculer entre discussion et agent (outils)",
+            "/mode <nom>      chat (aucun outil), plan (lecture seule), agent (outils)",
             "/modele <nom>    changer de modèle",
             "/cout            dépense du jour",
             "/quitter",
@@ -189,10 +190,14 @@ async function main(): Promise<void> {
         if (entry) session.drop(entry.id);
         return false;
       }
-      case "agent":
-        agentMode = !agentMode;
-        console.log(C.dim(`mode ${agentMode ? "agent (outils actifs)" : "discussion"}.`));
+      case "mode": {
+        const wanted = MODES.find((m) => m.id === arg);
+        if (wanted) mode = wanted.id;
+        const current = MODES.find((m) => m.id === mode)!;
+        console.log(C.dim(`mode ${current.id} — ${current.hint}`));
+        if (!wanted) console.log(C.dim(`(modes : ${MODES.map((m) => m.id).join(", ")})`));
         return false;
+      }
       case "modele":
         if (arg) cfg.model = arg;
         console.log(C.dim(`modèle : ${cfg.model}`));
@@ -222,9 +227,10 @@ async function main(): Promise<void> {
     const onSigint = () => ctl.abort();
     process.on("SIGINT", onSigint);
 
-    const ambient = await repoMap(cwd, Math.floor(cfg.contextTokens * 0.35));
+    // Chat mode answers from what it is given: no repository map, no tools, no surprises.
+    const ambient = mode === "chat" ? undefined : await repoMap(cwd, Math.floor(cfg.contextTokens * 0.35));
     const built = session.build({
-      systemPrompt: AGENT_PROMPT,
+      systemPrompt: promptForMode(mode),
       ambient,
       maxTokens: cfg.contextTokens,
       nonce: randomNonce(),
@@ -257,13 +263,11 @@ async function main(): Promise<void> {
       }
     }
 
-    const tools = agentMode
-      ? buildCliTools({
-          cwd,
-          blockedGlobs: cfg.blockedGlobs,
-          showDiff: (path, before, after) => printDiff(path, before, after),
-        })
-      : [];
+    // The mode decides the tool set in code: plan mode simply has no tool that writes.
+    const tools = toolsForMode(
+      buildCliTools({ cwd, blockedGlobs: cfg.blockedGlobs, showDiff: (path, before, after) => printDiff(path, before, after) }),
+      mode,
+    );
 
     let printed = false;
     try {

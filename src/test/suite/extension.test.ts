@@ -5,9 +5,9 @@ import * as assert from "node:assert/strict";
 import * as vscode from "vscode";
 import { suite, test } from "./tiny.js";
 
-const ID = "hivey.hivey-forge";
+const ID = "hivey.forge";
 
-suite("Hivey Forge", () => {
+suite("Forge", () => {
   test("the extension is present and activates", async () => {
     const ext = vscode.extensions.getExtension(ID);
     assert.ok(ext, "extension not found by id");
@@ -25,7 +25,7 @@ suite("Hivey Forge", () => {
   });
 
   test("settings read back with the defaults the manifest declares", () => {
-    const c = vscode.workspace.getConfiguration("hiveyForge");
+    const c = vscode.workspace.getConfiguration("forge");
     assert.equal(c.get("chat.provider"), "local");
     assert.equal(c.get("privacy.redaction"), "strict");
     assert.equal(c.get("completion.enabled"), true);
@@ -36,7 +36,7 @@ suite("Hivey Forge", () => {
     // Point at a closed port so the failure is immediate and deterministic. This is the path a
     // user hits on their first day — before `ollama serve` — and it must produce no suggestion and
     // no error dialog, not an exception in the extension host.
-    const config = vscode.workspace.getConfiguration("hiveyForge");
+    const config = vscode.workspace.getConfiguration("forge");
     await config.update("endpoints.local", "http://127.0.0.1:45387/v1", vscode.ConfigurationTarget.Global);
     await config.update("completion.debounceMs", 0, vscode.ConfigurationTarget.Global);
     try {
@@ -59,8 +59,8 @@ suite("Hivey Forge", () => {
   });
 
   test("the reports open without a script and without a model", async () => {
-    await vscode.commands.executeCommand("hiveyForge.showEgress");
-    await vscode.commands.executeCommand("hiveyForge.showCosts");
+    await vscode.commands.executeCommand("forge.showEgress");
+    await vscode.commands.executeCommand("forge.showCosts");
   });
 
   test("quick fixes are offered on a diagnostic", async () => {
@@ -72,7 +72,7 @@ suite("Hivey Forge", () => {
     const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>("vscode.executeCodeActionProvider", doc.uri, range);
     const titles = (actions ?? []).map((a) => a.title);
     assert.ok(
-      titles.some((t) => t.startsWith("Corriger avec Hivey Forge")),
+      titles.some((t) => t.startsWith("Corriger avec Forge")),
       `no Forge quick fix among: ${titles.join(" | ")}`,
     );
     collection.dispose();
@@ -89,7 +89,7 @@ suite("Screenshot", () => {
     async () => {
       if (!process.env["FORGE_SCREENSHOT"]) return;
 
-      const config = vscode.workspace.getConfiguration("hiveyForge");
+      const config = vscode.workspace.getConfiguration("forge");
       await config.update("endpoints.local", process.env["FORGE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
       await config.update("chat.model", "qwen2.5-coder:7b", vscode.ConfigurationTarget.Global);
 
@@ -110,14 +110,19 @@ suite("Screenshot", () => {
       // sidebar wide enough to read — the width a user would actually give it.
       await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
-      await vscode.commands.executeCommand("hiveyForge.chat.focus");
+      await vscode.commands.executeCommand("forge.chat.focus");
       for (let i = 0; i < 10; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
-      await vscode.commands.executeCommand("hiveyForge.askWith", "Cette fonction arrondit-elle correctement ? Que corriger ?");
+      await vscode.commands.executeCommand("forge.askWith", "Cette fonction arrondit-elle correctement ? Que corriger ?");
       await new Promise((r) => setTimeout(r, 4000));
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
 
-      // Long enough for the turn to stream and render, then for the capture to happen.
-      await new Promise((r) => setTimeout(r, Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 45_000)));
+      const hold = Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 45_000);
+      // Sit on the conversation, then walk the other screens so each one can be captured.
+      await new Promise((r) => setTimeout(r, hold));
+      for (const command of ["forge.showHistory", "forge.showModels", "forge.showPermissions"]) {
+        await vscode.commands.executeCommand(command);
+        await new Promise((r) => setTimeout(r, 18_000));
+      }
     },
     200_000,
   );

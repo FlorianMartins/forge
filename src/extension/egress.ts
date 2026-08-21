@@ -38,9 +38,9 @@ export interface EgressRecord {
   redactionSummary: string;
 }
 
-const LEDGER_KEY = "hiveyForge.egress.ledger";
-const SPEND_KEY = "hiveyForge.spend";
-const CONSENT_KEY = "hiveyForge.consent";
+const LEDGER_KEY = "forge.egress.ledger";
+const SPEND_KEY = "forge.spend";
+const CONSENT_KEY = "forge.consent";
 const LEDGER_MAX = 500;
 
 export class WorkspaceSpendStore implements SpendStore {
@@ -93,7 +93,7 @@ export class EgressGate {
 
     if (hasSecret) {
       const proceed = await vscode.window.showWarningMessage(
-        `Hivey Forge : ce que vous êtes sur le point d'envoyer contient ${findings.filter((f) => f.kind === "secret").length} élément(s) ressemblant à un secret. Ils ont été remplacés par des marqueurs, mais rien ne remplace une relecture.`,
+        `Forge : ce que vous êtes sur le point d'envoyer contient ${findings.filter((f) => f.kind === "secret").length} élément(s) ressemblant à un secret. Ils ont été remplacés par des marqueurs, mais rien ne remplace une relecture.`,
         { modal: true },
         "Envoyer (marqueurs en place)",
         "Annuler",
@@ -123,7 +123,7 @@ export class EgressGate {
 
     const summary = summarise(findings);
     const answer = await vscode.window.showInformationMessage(
-      `Hivey Forge va envoyer ~${tokens} jetons à ${host} (${target.model}).` +
+      `Forge va envoyer ~${tokens} jetons à ${host} (${target.model}).` +
         (summary ? ` Anonymisé : ${summary}.` : " Aucune donnée sensible détectée."),
       { modal: true },
       "Envoyer",

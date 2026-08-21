@@ -239,6 +239,64 @@ test("Anthropic: the stable prefix is marked for the prompt cache", async () => 
   assert.equal(r.usage.completionTokens, 5);
 });
 
+test("reasoning effort is translated per provider, not passed through", async () => {
+  // OpenRouter normalises it under `reasoning`; an OpenAI-shaped gateway takes `reasoning_effort`.
+  const or = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+  await new OpenAICompatibleProvider({ id: "openrouter", baseUrl: or.url, isLocal: false, apiKey: "k" }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+    reasoning: "high",
+  });
+  assert.deepEqual(or.requests[0]!.body.reasoning, { effort: "high" });
+  assert.equal(or.requests[0]!.body.reasoning_effort, undefined);
+  await or.close();
+
+  const gateway = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+  await new OpenAICompatibleProvider({ id: "openai-compatible", baseUrl: gateway.url, isLocal: false, apiKey: "k" }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+    reasoning: "low",
+  });
+  assert.equal(gateway.requests[0]!.body.reasoning_effort, "low");
+  await gateway.close();
+});
+
+test("asking for no reasoning tells OpenRouter to exclude it, so a thinking model stops billing for it", async () => {
+  const s = await serve((_req, res) => sse(res, [{ choices: [{ delta: { content: "x" } }] }]));
+  await new OpenAICompatibleProvider({ id: "openrouter", baseUrl: s.url, isLocal: false, apiKey: "k" }).chat({
+    model: "m",
+    messages: [{ role: "user", content: "hi" }],
+    reasoning: "none",
+  });
+  assert.deepEqual(s.requests[0]!.body.reasoning, { exclude: true });
+  await s.close();
+});
+
+test("Anthropic: thinking is a token budget, and the answer must still fit after it", async () => {
+  const s = await serve((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write(`data: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "hmm" } })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "42" } })}\n\n`);
+    res.end();
+  });
+  const r = await new AnthropicProvider({ baseUrl: s.url, apiKey: "k" }).chat({
+    model: "claude-sonnet-4-5",
+    messages: [{ role: "user", content: "?" }],
+    reasoning: "medium",
+    maxTokens: 1024,
+    temperature: 0.7,
+  });
+  const body = s.requests[0]!.body;
+  await s.close();
+
+  assert.equal(body.thinking.type, "enabled");
+  assert.ok(body.thinking.budget_tokens >= 4096);
+  assert.ok(body.max_tokens > body.thinking.budget_tokens, "max_tokens must leave room for the answer");
+  assert.equal(body.temperature, undefined, "extended thinking and a temperature cannot both be set");
+  assert.equal(r.reasoning, "hmm", "the thinking is captured separately from the answer");
+  assert.equal(r.text, "42");
+});
+
 test("Anthropic: a tool call assembled from partial JSON", async () => {
   const s = await serve((_req, res) => {
     res.writeHead(200, { "Content-Type": "text/event-stream" });

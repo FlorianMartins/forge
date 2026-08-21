@@ -77,7 +77,7 @@ async function scratchRepo(): Promise<string> {
 test("the terminal client answers a one-shot question and streams the reply", async () => {
   const fake = await fakeModel(["Bonjour", " depuis le terminal."]);
   const cwd = await scratchRepo();
-  const { out, code } = await runCli(["dis bonjour"], { HIVEY_FORGE_URL: fake.url, HIVEY_FORGE_MODEL: "m" }, cwd);
+  const { out, code } = await runCli(["dis bonjour"], { FORGE_URL: fake.url, FORGE_MODEL: "m" }, cwd);
   await fake.close();
 
   assert.equal(code, 0);
@@ -88,7 +88,7 @@ test("the terminal client answers a one-shot question and streams the reply", as
 test("the repository map is built from the real working directory and sent as a cacheable prefix", async () => {
   const fake = await fakeModel(["ok"]);
   const cwd = await scratchRepo();
-  await runCli(["que fait ce code ?"], { HIVEY_FORGE_URL: fake.url, HIVEY_FORGE_MODEL: "m" }, cwd);
+  await runCli(["que fait ce code ?"], { FORGE_URL: fake.url, FORGE_MODEL: "m" }, cwd);
   await fake.close();
 
   const sent = JSON.stringify(fake.bodies[0]);
@@ -100,16 +100,16 @@ test("the repository map is built from the real working directory and sent as a 
 test("a local endpoint is not redacted — the whole point of running one", async () => {
   const fake = await fakeModel(["ok"]);
   const cwd = await scratchRepo();
-  await runCli(["contacte alice@corp.fr sur 10.0.0.9"], { HIVEY_FORGE_URL: fake.url, HIVEY_FORGE_MODEL: "m" }, cwd);
+  await runCli(["contacte alice@corp.fr sur 10.0.0.9"], { FORGE_URL: fake.url, FORGE_MODEL: "m" }, cwd);
   await fake.close();
   const sent = JSON.stringify(fake.bodies[0]);
   assert.match(sent, /alice@corp\.fr/);
 });
 
-test("configuration comes from .hivey-forge.json in the working directory", async () => {
+test("configuration comes from .forge.json in the working directory", async () => {
   const fake = await fakeModel(["ok"]);
   const cwd = await scratchRepo();
-  await writeFile(join(cwd, ".hivey-forge.json"), JSON.stringify({ model: "modele-du-projet", baseUrl: fake.url }));
+  await writeFile(join(cwd, ".forge.json"), JSON.stringify({ model: "modele-du-projet", baseUrl: fake.url }));
   const { out } = await runCli(["salut"], {}, cwd);
   await fake.close();
 

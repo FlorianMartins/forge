@@ -1,4 +1,4 @@
-# Hivey Forge
+# Forge
 
 **Un assistant de code pour VS Code qui ne fait pas sortir votre code.**
 Modèles locaux (Ollama, LM Studio, vLLM, llama.cpp) ou passerelle distante (OpenRouter, Azure,
@@ -6,10 +6,14 @@ LiteLLM, Anthropic) — au choix, par rôle, et **anonymisé quand ça sort**.
 
 Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télémétrie**.
 
-![La barre latérale de Hivey Forge dans VS Code](docs/images/sidebar.png)
+![La barre latérale de Forge dans VS Code](docs/images/conversation.png)
 
-*Capture réelle : l'extension chargée dans VS Code, une réponse rendue par le panneau. Seul le
-modèle qui répond est un serveur de test — le reste est le produit.*
+*Captures réelles, prises dans un VS Code lancé par la suite d'intégration. Seul le modèle qui
+répond est un serveur de test ; l'interface, elle, est le produit.*
+
+| Conversations | Modèles |
+|---|---|
+| ![Historique et filtres](docs/images/historique.png) | ![Comparateur de modèles](docs/images/modeles.png) |
 
 ---
 
@@ -23,7 +27,7 @@ GitHub Copilot est excellent et pose deux problèmes à une entreprise :
 2. **Le coût est structurel.** Le produit envoie tout à un gros modèle distant, parce que c'est le
    produit. On paie par développeur, tous les mois, pour des complétions dont 90 % sont triviales.
 
-Hivey Forge inverse les deux : **le défaut est le modèle qui tourne déjà sur votre machine**, le
+Forge inverse les deux : **le défaut est le modèle qui tourne déjà sur votre machine**, le
 modèle distant est une **escalade** qu'il faut justifier, consentir et payer sur un budget ; et tout
 ce qui sort est **anonymisé de façon réversible** avant de partir.
 
@@ -36,8 +40,13 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Mode agent** | L'assistant lit le dépôt, cherche, consulte les **diagnostics de l'éditeur**, modifie des fichiers et propose des commandes — **une approbation par action**, diff avant écriture, tout dans la pile d'annulation. |
 | **Terminal** | La commande `forge` : le même noyau, en REPL, avec la sortie des commandes réellement capturée et un diff imprimé avant chaque écriture. |
 | **Dans l'éditeur** | `Ctrl+I` réécrit la sélection sur place · clic droit → interroger la sélection · message de commit rédigé depuis l'index · « expliquer la sortie du terminal ». |
-| **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Hivey Forge » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
+| **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Forge » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
 | **Raccourcis de saisie** | `#` ouvre le sélecteur de fichiers de VS Code · `/expliquer`, `/tests`, `/corriger`, `/revue`, `/doc` joignent le fichier actif et posent la bonne question. |
+| **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. |
+| **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. Le texte de réflexion s'affiche dans un bloc repliable et n'est jamais renvoyé au modèle. |
+| **Permissions** | Par action et par forme d'action : « autoriser une fois », « pour cette conversation », « toujours ». Autoriser `npm test` n'autorise pas `npm publish`. Un écran dédié liste ce qui est permanent et ce qui expire. |
+| **Recherche** | Dans la conversation ouverte (`Ctrl+F`, résultats surlignés) **et** dans tout l'historique — la recherche regarde à l'intérieur des messages et montre le fragment qui correspond. |
+| **Filtres d'historique** | Période, mode, « payantes seulement », tri par dernière modification / création / longueur / coût. |
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 
@@ -81,7 +90,7 @@ Quatre étapes, dans cet ordre, sur tout ce qui part vers un fournisseur distant
 4. **Consentement.** Avant la première requête vers une destination donnée : ce qui part (volume,
    destination, modèle) et ce qui a été masqué.
 
-Ensuite, **la preuve** : `Hivey Forge : Aperçu des données sortantes` liste chaque envoi distant —
+Ensuite, **la preuve** : `Forge : Aperçu des données sortantes` liste chaque envoi distant —
 horodatage, hôte, modèle, jetons, part servie par le cache, coût, catégories anonymisées. **Jamais
 le contenu** : un journal de ce qu'on voulait garder privé n'est pas une fonction de confidentialité.
 
@@ -100,12 +109,12 @@ Les points où d'autres se trompent, et qui sont traités ici :
 ## Installation
 
 ```bash
-git clone https://github.com/FlorianMartins/hivey-forge
-cd hivey-forge
+git clone https://github.com/FlorianMartins/forge
+cd forge
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produit hivey-forge.vsix
-code --install-extension hivey-forge.vsix
+npx @vscode/vsce package --no-dependencies   # produit forge.vsix
+code --install-extension forge.vsix
 ```
 
 Côté modèle, le plus simple :
@@ -117,8 +126,8 @@ ollama serve
 
 Rien d'autre à configurer : les valeurs par défaut visent `http://127.0.0.1:11434/v1`.
 
-Pour ajouter une escalade distante : `Hivey Forge : Enregistrer une clé de fournisseur`, puis
-renseigner `hiveyForge.escalation.model` (par exemple `anthropic/claude-sonnet-4.5`).
+Pour ajouter une escalade distante : `Forge : Enregistrer une clé de fournisseur`, puis
+renseigner `forge.escalation.model` (par exemple `anthropic/claude-sonnet-4.5`).
 
 ### Le client terminal
 
@@ -128,14 +137,14 @@ forge               # REPL dans le dossier courant
 forge "pourquoi ce test est instable ?"   # question unique
 ```
 
-Configuration par `.hivey-forge.json` (dossier courant, puis `~`) — un projet peut donc committer
+Configuration par `.forge.json` (dossier courant, puis `~`) — un projet peut donc committer
 sa configuration d'équipe sans committer de clé (`apiKeyEnv` nomme la variable d'environnement).
 
 Une session, dans les grandes lignes (l'échange est un exemple, la mise en forme est celle du
 client) :
 
 ```
-Hivey Forge — assistant de code souverain
+Forge — assistant de code souverain
 qwen2.5-coder:7b via 127.0.0.1:11434 · local (coût nul)
 /aide pour les commandes, Ctrl+C pour quitter.
 
@@ -156,16 +165,16 @@ cela produit des écarts d'un centime que la comptabilité refuse.
 
 Les commandes du REPL : `/contexte` liste les échanges, `/muet 3` en retire un du contexte sans
 l'effacer, `/oublier 3` le supprime, `/agent` bascule outils actifs / discussion seule, `/cout`
-donne la dépense du jour. Depuis l'éditeur, `Hivey Forge : Ouvrir Forge dans le terminal` le lance
+donne la dépense du jour. Depuis l'éditeur, `Forge : Ouvrir Forge dans le terminal` le lance
 avec la même configuration que la barre latérale.
 
 ## Déploiement en entreprise
 
 - Servez un modèle une fois pour tous : **vLLM** ou **Ollama** derrière une URL interne, et poussez
-  `hiveyForge.endpoints.local` par la stratégie de réglages VS Code.
+  `forge.endpoints.local` par la stratégie de réglages VS Code.
 - Verrouillez ce qui doit l'être : `privacy.blockedGlobs`, `privacy.customTerms` (noms de clients,
   de projets), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
-- Les réglages `hiveyForge.*` sont validés par espace de travail : un dépôt sensible peut imposer
+- Les réglages `forge.*` sont validés par espace de travail : un dépôt sensible peut imposer
   `chat.provider: "local"` dans son `.vscode/settings.json`.
 - L'extension n'embarque **aucune dépendance à l'exécution** : le paquet à auditer, c'est le bundle
   et rien d'autre. Le SBOM est publié à chaque CI.
@@ -179,11 +188,12 @@ src/core/         aucun import de `vscode` — testable sans éditeur
   router/         local d'abord, escalade consentie, prix, budget
   completion/     FIM par famille de modèle, cache, nettoyage des réponses
   context/        carte du dépôt, symboles, imports
-  session/        le transcript et le prompt qui en est dérivé
-  agent/          la boucle outils : approbation déléguée, anonymisation en un seul point
+  session/        le transcript, le prompt qui en est dérivé, les modes et l'historique
+  agent/          la boucle outils, et le registre des permissions
 src/extension/    la couche VS Code (barre latérale, complétion, commandes, porte de sortie)
 src/cli/          le client terminal
-src/webview/      le panneau (aucun `innerHTML` sur du texte de modèle)
+src/webview/      le panneau : écrans conversation / historique / modèles / permissions,
+                  icônes SVG dessinées, aucun `innerHTML` sur du texte de modèle
 ```
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
@@ -193,7 +203,7 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test               # construit les bundles, puis 95 tests (node:test)
+npm test               # construit les bundles, puis 120 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (7 tests, headless)
 npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
 npm run typecheck
@@ -218,7 +228,7 @@ Apache-2.0.
 
 ### In short (English)
 
-Hivey Forge is an open-source coding assistant for VS Code, built for teams that cannot send their
+Forge is an open-source coding assistant for VS Code, built for teams that cannot send their
 source code to a third party. It defaults to a model running on your own machine (Ollama, LM Studio,
 vLLM, llama.cpp) and treats a remote provider (OpenRouter, Azure, Anthropic, any OpenAI-compatible
 gateway) as an escalation that must be justified, consented to, and paid for from a budget.

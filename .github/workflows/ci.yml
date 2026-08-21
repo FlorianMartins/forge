@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true # a provider outage must not turn the build red
 
       - name: Package the extension
-        run: npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-forge.vsix
+        run: npx --yes @vscode/vsce@3 package --no-dependencies -o forge.vsix
 
       - name: Software bill of materials
         run: |
@@ -59,9 +59,9 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hivey-forge-vsix
+          name: forge-vsix
           path: |
-            hivey-forge.vsix
+            forge.vsix
             sbom.json
           retention-days: 30
 

@@ -17,7 +17,7 @@
 // unmatched tool result from a provider that is strict about it gets a 400 and the user gets a
 // mysterious failure.
 
-import type { ChatMessage, ChatResult, Provider, ToolCall, ToolSchema, Usage } from "../providers/types.js";
+import type { ChatMessage, ChatResult, Provider, ReasoningEffort, ToolCall, ToolSchema, Usage } from "../providers/types.js";
 
 export interface ToolContext {
   /** Cancels when the user stops the turn. */
@@ -56,6 +56,7 @@ export interface TurnOptions {
   maxSteps?: number;
   maxTokens?: number;
   temperature?: number;
+  reasoning?: ReasoningEffort;
   signal?: AbortSignal;
   onDelta?: (d: { text?: string; reasoning?: string }) => void;
   onStep?: (info: { step: number; toolCalls: ToolCall[] }) => void;
@@ -105,6 +106,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           tools: schemas.length ? schemas : undefined,
           maxTokens: opts.maxTokens,
           temperature: opts.temperature,
+          reasoning: opts.reasoning,
           signal: opts.signal,
         },
         opts.onDelta,

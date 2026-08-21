@@ -24,7 +24,9 @@ if (!res.ok) {
 }
 const { data } = await res.json();
 
-const prices = {};
+// Compact tuples rather than objects: 400 models, one line each, and a daily diff a human can read.
+// [id, display name, vendor, context window, $/M in, $/M out, $/M cached-in]
+const rows = [];
 let kept = 0;
 for (const m of data ?? []) {
   const p = m.pricing ?? {};
@@ -34,27 +36,22 @@ for (const m of data ?? []) {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? Number((n * 1_000_000).toFixed(4)) : 0;
   };
-  const entry = { in: perMillion(p.prompt), out: perMillion(p.completion) };
-  const cached = perMillion(p.input_cache_read);
-  if (cached) entry.cachedIn = cached;
+  const inUsd = perMillion(p.prompt);
+  const outUsd = perMillion(p.completion);
+  const cachedUsd = perMillion(p.input_cache_read);
   // A free endpoint is worth recording as free: it is what makes `:free` variants usable.
-  if (!entry.in && !entry.out && !/:free$/.test(m.id)) continue;
-  prices[m.id] = entry;
+  if (!inUsd && !outUsd && !/:free$/.test(m.id)) continue;
+
+  const vendor = m.id.includes("/") ? m.id.slice(0, m.id.indexOf("/")) : "";
+  const name = String(m.name ?? m.id).replace(/^[^:]+:\s*/, "");
+  rows.push([m.id, name, vendor, Number(m.context_length ?? 0), inUsd, outUsd, cachedUsd]);
   kept++;
-
-  // Native APIs use the bare id (`claude-sonnet-4-5`, `gpt-5`); OpenRouter prefixes it with the
-  // vendor. Alias the bare form so the same model is priced whichever door it came through.
-  const bare = m.id.includes("/") ? m.id.slice(m.id.indexOf("/") + 1) : undefined;
-  if (bare && !prices[bare]) prices[bare] = entry;
 }
-
-// Local inference costs electricity, not tokens — and the wildcard makes that explicit rather than
-// leaving a local model "unknown cost".
-prices["local/*"] = { in: 0, out: 0 };
+rows.sort((a, b) => a[0].localeCompare(b[0]));
 
 const body = `// GENERATED FILE — do not edit by hand.
 // Written by \`npm run models\` (scripts/update-models.mjs); a scheduled workflow commits the diff.
-// ${kept} priced models, in USD per million tokens.
+// ${kept} priced models. Tuples: [id, name, vendor, context, $/M in, $/M out, $/M cached-in].
 //
 // A model that is absent from this table is reported as "unknown cost" rather than guessed: a
 // wrong price silently spends someone's budget.
@@ -63,11 +60,26 @@ import type { Price } from "./pricing.js";
 
 export const GENERATED_AT = ${JSON.stringify(new Date().toISOString().slice(0, 10))};
 
-export const GENERATED_PRICES: Record<string, Price> = {
-${Object.entries(sortKeys(prices))
-  .map(([id, p]) => `  ${JSON.stringify(id)}: ${JSON.stringify(p)},`)
-  .join("\n")}
-};
+export type ModelRow = [string, string, string, number, number, number, number];
+
+export const GENERATED_MODELS: ModelRow[] = [
+${rows.map((r) => `  ${JSON.stringify(r)},`).join("\n")}
+];
+
+/**
+ * Prices, keyed by id. Bare ids are aliased too: a native API calls it \`claude-sonnet-4-5\` where
+ * OpenRouter calls it \`anthropic/claude-sonnet-4.5\`, and both should be priced.
+ */
+export const GENERATED_PRICES: Record<string, Price> = (() => {
+  const table: Record<string, Price> = { "local/*": { in: 0, out: 0 } };
+  for (const [id, , , , inUsd, outUsd, cachedUsd] of GENERATED_MODELS) {
+    const price: Price = cachedUsd ? { in: inUsd, out: outUsd, cachedIn: cachedUsd } : { in: inUsd, out: outUsd };
+    table[id] = price;
+    const bare = id.includes("/") ? id.slice(id.indexOf("/") + 1) : undefined;
+    if (bare && !table[bare]) table[bare] = price;
+  }
+  return table;
+})();
 `;
 
 const previous = await readFile(OUT, "utf8").catch(() => "");
@@ -83,9 +95,3 @@ if (check) {
 }
 await writeFile(OUT, body, "utf8");
 console.log(`Wrote ${OUT} — ${kept} models.`);
-
-// One line per model: a 400-entry table pretty-printed over four lines each turns every daily
-// refresh into an unreadable diff.
-function sortKeys(obj) {
-  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)));
-}

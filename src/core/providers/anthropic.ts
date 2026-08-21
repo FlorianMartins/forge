@@ -8,7 +8,7 @@
 import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
-import { EMPTY_USAGE } from "./types.js";
+import { EMPTY_USAGE, THINKING_BUDGET } from "./types.js";
 import { describeHttpError } from "./openai.js";
 
 export interface AnthropicOptions {
@@ -62,7 +62,16 @@ export class AnthropicProvider implements Provider {
         return b;
       });
     }
-    if (req.temperature != null) body["temperature"] = req.temperature;
+    if (req.reasoning && req.reasoning !== "none") {
+      const budget = THINKING_BUDGET[req.reasoning];
+      body["thinking"] = { type: "enabled", budget_tokens: budget };
+      // The answer has to fit AFTER the thinking, and the API rejects max_tokens <= budget.
+      body["max_tokens"] = Math.max(Number(body["max_tokens"] ?? 4096), budget + 4096);
+      // Extended thinking and a temperature cannot both be set.
+      delete body["temperature"];
+    } else if (req.temperature != null) {
+      body["temperature"] = req.temperature;
+    }
     if (req.tools?.length) {
       body["tools"] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
     }

@@ -121,7 +121,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
           new vscode.Range(position, position),
           // Counting acceptances is the only telemetry here, it stays on this machine, and it is
           // what tells a team whether a small local model is good enough for them.
-          { command: "hiveyForge.completionAccepted", title: "", arguments: [] },
+          { command: "forge.completionAccepted", title: "", arguments: [] },
         ),
       ];
     } catch (err) {
@@ -174,7 +174,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     this.status.text = on ? `$(sparkle) Forge${local ? "" : " ☁"}` : "$(circle-slash) Forge";
     this.status.tooltip = new vscode.MarkdownString(
       [
-        `**Hivey Forge** — complétion ${on ? "active" : "désactivée"}`,
+        `**Forge** — complétion ${on ? "active" : "désactivée"}`,
         "",
         `Modèle : \`${settings.completion.model}\` (${local ? "local, coût nul" : "distant"})`,
         `Suggestions demandées cette session : ${this.requested} · acceptées : ${this.accepted}`,
@@ -182,7 +182,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         "Cliquer pour activer ou désactiver.",
       ].join("\n"),
     );
-    this.status.command = "hiveyForge.toggleCompletions";
+    this.status.command = "forge.toggleCompletions";
     this.status.show();
   }
 

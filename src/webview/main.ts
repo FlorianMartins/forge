@@ -1,472 +1,315 @@
-// The panel. Runs in the webview sandbox: no network, no node, no `innerHTML` on anything a model
-// wrote — every node in the transcript is built with `createElement` and `textContent`, so a code
-// block that contains `<img onerror=…>` renders as the characters the model produced and nothing
-// happens. That is the whole reason there is a renderer here instead of a markdown library.
+// The panel: state, routing between screens, and the live turn.
+//
+// One state object arrives from the extension and the whole panel is rebuilt from it. That is
+// deliberate: the alternative — patching the DOM as messages arrive — is how a chat panel ends up
+// showing a muted message as active, or a model name that changed three turns ago. The only thing
+// rendered incrementally is the answer being streamed, because that one has to be.
 
-import type { ToExtension, ToPanel, UiEntry, UiState } from "../shared/protocol.js";
+import { button, closeMenu, el, icon, ICON, menu, menuItem, menuTitle, searchInput, separator } from "./dom.js";
+import { chatScreen, collapsible, isStreaming, setStreaming, type ChatDeps } from "./chat.js";
+import { historyScreen } from "./history.js";
+import { modelsScreen } from "./models.js";
+import { permissionsScreen } from "./permissions.js";
+import { markdown } from "./markdown.js";
+import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
 const send = (m: ToExtension) => vscode.postMessage(m);
 
 let state: UiState | undefined;
-let streaming = false;
-let streamNode: HTMLElement | undefined;
-let historyOpen = false;
+let searchOpen = false;
+let live: LiveTurn | undefined;
 
 const app = document.getElementById("app")!;
 
-// ── Rendering ────────────────────────────────────────────────────────────────────────────────
+const deps: ChatDeps = {
+  send,
+  state: () => state,
+  rerender: () => render(),
+};
+
+// ── Shell ────────────────────────────────────────────────────────────────────────────────────
 
 function render(): void {
   if (!state) return;
+  closeMenu();
   app.textContent = "";
-  app.append(header(state), historyOpen ? historyPanel(state) : transcript(state), composer(state));
+  app.append(header(state));
+  if (searchOpen && state.screen === "chat") app.append(searchBar(state));
+
+  switch (state.screen) {
+    case "history":
+      app.append(historyScreen(state, send));
+      break;
+    case "models":
+      app.append(modelsScreen(state, send, render));
+      break;
+    case "permissions":
+      app.append(permissionsScreen(state, send));
+      break;
+    case "chat":
+    default:
+      app.append(chatScreen(state, deps));
+      break;
+  }
+  live = undefined;
   scrollToEnd();
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-function button(label: string, title: string, onClick: () => void, className = "icon"): HTMLButtonElement {
-  const b = el("button", className, label);
-  b.title = title;
-  b.setAttribute("aria-label", title);
-  b.addEventListener("click", onClick);
-  return b;
-}
-
 function header(s: UiState): HTMLElement {
-  const bar = el("header", "bar");
-  const left = el("div", "bar-left");
+  const bar = el("header", "topbar");
+  const left = el("div", "topbar-left");
 
-  const badge = el("span", `badge ${s.remote ? "remote" : "local"}`, s.remote ? "distant" : "local");
-  badge.title = s.remote
-    ? "Ce fournisseur est distant : ce que vous envoyez est anonymisé, et vous êtes prévenu avant chaque nouvelle destination."
-    : "Ce fournisseur tourne sur votre machine ou votre réseau : rien ne sort.";
-  left.append(badge);
-
-  const model = button(s.model, "Changer de modèle", () => send({ type: "pickModel" }), "model");
-  left.append(model);
-
-  const right = el("div", "bar-right");
-  const ctx = el("span", "tokens", `${formatTokens(s.contextTokens)} de contexte`);
-  ctx.title = "Ce que la prochaine question enverra, une fois les échanges muets retirés.";
-  right.append(ctx);
-
-  if (s.budget.dailyUsd > 0 || s.budget.spentTodayUsd > 0) {
-    const cost = button(
-      `$${s.budget.spentTodayUsd.toFixed(3)}`,
-      "Dépense distante d'aujourd'hui — cliquer pour le détail",
-      () => send({ type: "openEgress" }),
-      "cost",
+  if (s.screen !== "chat") {
+    left.append(
+      button({
+        icon: ICON.back,
+        title: "Retour à la conversation",
+        className: "btn icon-only",
+        onClick: () => send({ type: "openScreen", screen: "chat" }),
+      }),
     );
-    right.append(cost);
+    left.append(el("span", "topbar-title", screenTitle(s)));
+  } else {
+    const title = el("span", "topbar-title", s.session.title || "Nouvelle conversation");
+    title.title = s.session.title || "";
+    left.append(title);
+    const badge = el("span", `badge ${s.remote ? "remote" : "local"}`, s.remote ? "distant" : "local");
+    badge.title = s.remote
+      ? "Fournisseur distant : ce qui part est anonymisé, et un journal des envois est tenu."
+      : "Fournisseur local : rien ne quitte votre machine ou votre réseau.";
+    left.append(badge);
   }
-  right.append(button("☰", "Historique des discussions", () => {
-    historyOpen = !historyOpen;
-    render();
-  }));
-  right.append(button("＋", "Nouvelle discussion", () => send({ type: "newSession" })));
+
+  const right = el("div", "topbar-right");
+  if (s.screen === "chat") {
+    right.append(
+      button({
+        icon: ICON.search,
+        title: "Rechercher dans cette conversation",
+        className: `btn icon-only${searchOpen ? " active" : ""}`,
+        onClick: () => {
+          searchOpen = !searchOpen;
+          if (!searchOpen && s.searchQuery) send({ type: "search", query: "" });
+          else render();
+        },
+      }),
+    );
+  }
+  right.append(
+    button({
+      icon: ICON.history,
+      title: "Historique des conversations",
+      className: `btn icon-only${s.screen === "history" ? " active" : ""}`,
+      onClick: () => send({ type: "openScreen", screen: "history" }),
+    }),
+    button({
+      icon: ICON.add,
+      title: "Nouvelle conversation",
+      className: "btn icon-only",
+      onClick: () => send({ type: "newSession" }),
+    }),
+  );
+
+  const more = button({
+    icon: ICON.more,
+    title: "Plus",
+    className: "btn icon-only",
+    onClick: () =>
+      menu(more, (close) => {
+        const panel = el("div", "menu-list");
+        panel.append(menuTitle("Confidentialité et coûts"));
+        panel.append(
+          menuItem({
+            label: "Données sortantes",
+            hint: "Ce qui a quitté cette machine, sans le contenu",
+            onClick: () => {
+              send({ type: "openEgress" });
+              close();
+            },
+          }),
+          menuItem({
+            label: "Coûts et budget",
+            detail: s.budget.spentTodayUsd > 0 ? `${s.budget.spentTodayUsd.toFixed(3)} $` : "0 $",
+            hint: "Dépense du jour, par modèle",
+            onClick: () => {
+              send({ type: "openCosts" });
+              close();
+            },
+          }),
+          separator(),
+          menuItem({
+            label: "Permissions de l'agent",
+            hint: "Ce qui est autorisé sans demander",
+            onClick: () => {
+              send({ type: "openScreen", screen: "permissions" });
+              close();
+            },
+          }),
+          menuItem({
+            label: "Réglages de Forge",
+            onClick: () => {
+              send({ type: "openSettings" });
+              close();
+            },
+          }),
+        );
+        return panel;
+      }),
+  });
+  right.append(more);
 
   bar.append(left, right);
   return bar;
 }
 
-function historyPanel(s: UiState): HTMLElement {
-  const wrap = el("div", "history");
-  if (!s.history.length) wrap.append(el("p", "empty", "Aucune discussion enregistrée."));
-  for (const h of s.history) {
-    const row = el("div", `history-row${h.id === s.session.id ? " current" : ""}`);
-    const open = el("button", "history-open");
-    open.append(el("span", "history-title", h.title || "(sans titre)"));
-    open.append(el("span", "history-date", new Date(h.updatedAt).toLocaleString("fr-FR")));
-    open.addEventListener("click", () => {
-      historyOpen = false;
-      send({ type: "openSession", id: h.id });
-    });
-    row.append(open, button("✕", "Supprimer cette discussion", () => send({ type: "deleteSession", id: h.id })));
-    wrap.append(row);
+function screenTitle(s: UiState): string {
+  switch (s.screen) {
+    case "history":
+      return "Conversations";
+    case "models":
+      return "Modèles";
+    case "permissions":
+      return "Permissions";
+    default:
+      return "Forge";
   }
-  return wrap;
 }
 
-function transcript(s: UiState): HTMLElement {
-  const list = el("div", "transcript");
-  if (!s.session.entries.length) list.append(welcome());
-  for (const entry of s.session.entries) list.append(renderEntry(entry));
-  return list;
-}
-
-function welcome(): HTMLElement {
-  const w = el("div", "welcome");
-  w.append(el("h2", undefined, "Hivey Forge"));
-  w.append(
-    el(
-      "p",
-      undefined,
-      "Posez une question sur le code ouvert, ou décrivez un changement. En mode agent, l'assistant lit le dépôt, modifie des fichiers et vous demande votre accord avant chaque écriture.",
-    ),
+function searchBar(s: UiState): HTMLElement {
+  const wrap = el("div", "search-bar");
+  wrap.append(
+    searchInput({
+      value: s.searchQuery,
+      placeholder: "Rechercher dans cette conversation…",
+      onInput: (query) => send({ type: "search", query }),
+      onEscape: () => {
+        searchOpen = false;
+        send({ type: "search", query: "" });
+      },
+    }),
   );
-  const tips = el("ul", "tips");
-  for (const t of [
-    "Joindre le fichier actif : le bouton 📎 sous la saisie.",
-    "Retirer un échange du contexte : l'icône 🚫 sur le message — il reste affiché, il n'est plus envoyé.",
-    "Épingler un message : il survit à la coupe quand le contexte est plein.",
-  ]) {
-    tips.append(el("li", undefined, t));
-  }
-  w.append(tips);
-  return w;
-}
-
-function renderEntry(entry: UiEntry): HTMLElement {
-  const wrap = el("article", `entry ${entry.role}${entry.included ? "" : " muted"}${entry.error ? " failed" : ""}`);
-
-  const head = el("div", "entry-head");
-  head.append(el("span", "who", entry.role === "user" ? "Vous" : "Forge"));
-  if (entry.model) head.append(el("span", "meta", entry.model));
-  if (entry.usdCost) head.append(el("span", "meta", `$${entry.usdCost.toFixed(4)}`));
-  if (!entry.included) head.append(el("span", "meta warn", "hors contexte"));
-  if (entry.pinned) head.append(el("span", "meta", "épinglé"));
-
-  const actions = el("div", "entry-actions");
-  actions.append(
-    button(entry.included ? "🚫" : "↩", entry.included ? "Retirer du contexte (reste affiché)" : "Remettre dans le contexte", () =>
-      send({ type: "setIncluded", id: entry.id, included: !entry.included }),
-    ),
-  );
-  actions.append(
-    button(entry.pinned ? "📌" : "📍", entry.pinned ? "Ne plus épingler" : "Épingler (survit à la coupe)", () =>
-      send({ type: "setPinned", id: entry.id, pinned: !entry.pinned }),
-    ),
-  );
-  if (entry.role === "user") {
-    actions.append(button("✎", "Modifier et renvoyer", () => startEdit(entry)));
-  }
-  actions.append(button("⧉", "Copier", () => send({ type: "copy", text: entry.text })));
-  actions.append(button("🗑", "Supprimer définitivement", () => send({ type: "dropEntry", id: entry.id })));
-  head.append(actions);
-  wrap.append(head);
-
-  if (entry.context?.length) {
-    const chips = el("div", "chips");
-    for (const c of entry.context) {
-      const chip = el("span", "chip", `${c.label}`);
-      chip.title = `${c.kind} · ~${formatTokens(c.tokens)}`;
-      chips.append(chip);
-    }
-    wrap.append(chips);
-  }
-
-  if (entry.error) {
-    wrap.append(el("div", "error", entry.error));
-  } else {
-    wrap.append(markdown(entry.text));
+  if (s.searchQuery) {
+    wrap.append(el("span", "muted", `${s.matches.length} message(s)`));
   }
   return wrap;
 }
 
-function startEdit(entry: UiEntry): void {
-  const area = document.querySelector<HTMLTextAreaElement>(".composer textarea");
-  if (!area) return;
-  area.value = entry.text;
-  area.focus();
-  const original = entry.text;
-  const onSend = () => {
-    if (area.value !== original) send({ type: "editEntry", id: entry.id, text: area.value });
-  };
-  area.dataset["editing"] = entry.id;
-  area.addEventListener("keydown", function once(ev) {
-    if (ev.key === "Enter" && !ev.shiftKey) {
-      ev.preventDefault();
-      area.removeEventListener("keydown", once);
-      delete area.dataset["editing"];
-      onSend();
-      area.value = "";
-    }
-  });
-}
+// ── The live turn ────────────────────────────────────────────────────────────────────────────
 
-// ── Markdown, rendered as DOM nodes rather than as HTML ──────────────────────────────────────
+class LiveTurn {
+  readonly root: HTMLElement;
+  private readonly body: HTMLElement;
+  private text?: HTMLElement;
+  private thinking?: { wrap: HTMLElement; body: HTMLElement };
+  private buffer = "";
 
-function markdown(text: string): HTMLElement {
-  const body = el("div", "body");
-  const lines = text.split("\n");
-  let i = 0;
-  let paragraph: string[] = [];
-
-  const flush = () => {
-    if (!paragraph.length) return;
-    body.append(inline(paragraph.join("\n"), "p"));
-    paragraph = [];
-  };
-
-  while (i < lines.length) {
-    const line = lines[i]!;
-    const fence = line.match(/^\s*```([a-zA-Z0-9+#-]*)\s*$/);
-    if (fence) {
-      flush();
-      const lang = fence[1] ?? "";
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !/^\s*```\s*$/.test(lines[i]!)) code.push(lines[i++]!);
-      i++;
-      body.append(codeBlock(code.join("\n"), lang));
-      continue;
-    }
-    const heading = line.match(/^(#{1,4})\s+(.*)$/);
-    if (heading) {
-      flush();
-      body.append(el(`h${Math.min(4, heading[1]!.length + 2)}` as "h4", "md-h", heading[2]!));
-      i++;
-      continue;
-    }
-    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
-    if (bullet) {
-      flush();
-      const ul = el("ul", "md-list");
-      while (i < lines.length) {
-        const b = lines[i]!.match(/^\s*[-*]\s+(.*)$/);
-        if (!b) break;
-        ul.append(inline(b[1]!, "li"));
-        i++;
-      }
-      body.append(ul);
-      continue;
-    }
-    if (!line.trim()) {
-      flush();
-      i++;
-      continue;
-    }
-    paragraph.push(line);
-    i++;
-  }
-  flush();
-  return body;
-}
-
-/** Inline spans: `code`, **bold**, *italic*. Everything else stays literal text. */
-function inline<K extends keyof HTMLElementTagNameMap>(text: string, tag: K): HTMLElementTagNameMap[K] {
-  const node = el(tag, "md");
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) node.append(document.createTextNode(text.slice(last, m.index)));
-    const token = m[0];
-    if (token.startsWith("`")) node.append(el("code", "md-code", token.slice(1, -1)));
-    else if (token.startsWith("**")) node.append(el("strong", undefined, token.slice(2, -2)));
-    else node.append(el("em", undefined, token.slice(1, -1)));
-    last = m.index + token.length;
-  }
-  if (last < text.length) node.append(document.createTextNode(text.slice(last)));
-  return node;
-}
-
-function codeBlock(code: string, lang: string): HTMLElement {
-  const wrap = el("div", "code-block");
-  const head = el("div", "code-head");
-  head.append(el("span", "lang", lang || "code"));
-  const tools = el("div", "code-tools");
-  tools.append(button("Copier", "Copier ce bloc", () => send({ type: "copy", text: code }), "text"));
-  tools.append(button("Insérer", "Remplacer la sélection dans l'éditeur", () => send({ type: "insertCode", code }), "text"));
-  head.append(tools);
-  const pre = el("pre", "code");
-  pre.append(el("code", undefined, code));
-  wrap.append(head, pre);
-  return wrap;
-}
-
-// ── Composer ─────────────────────────────────────────────────────────────────────────────────
-
-// Slash commands. Each is a prompt someone would otherwise retype ten times a day; expanding them
-// in the panel keeps the model's instructions readable in the transcript instead of hiding them in
-// a system prompt nobody can see.
-const SLASH: Array<{ name: string; hint: string; prompt: string; attachActive?: boolean }> = [
-  {
-    name: "/expliquer",
-    hint: "expliquer le fichier ou la sélection",
-    prompt: "Explique ce code : ce qu'il fait, comment il s'inscrit dans le reste, et ce qui mérite attention.",
-    attachActive: true,
-  },
-  {
-    name: "/tests",
-    hint: "écrire des tests",
-    prompt: "Écris des tests pour ce code, dans le style et avec les outils déjà utilisés dans ce dépôt. Couvre les cas limites.",
-    attachActive: true,
-  },
-  {
-    name: "/corriger",
-    hint: "trouver et corriger le problème",
-    prompt: "Trouve le défaut de ce code et corrige-le. Explique en une phrase ce qui n'allait pas.",
-    attachActive: true,
-  },
-  {
-    name: "/revue",
-    hint: "revue : bugs, sécurité, lisibilité",
-    prompt:
-      "Fais la revue de ce code : bugs d'abord, puis sécurité, puis lisibilité. Ordonne par gravité, cite les lignes, ne signale rien dont tu ne sois pas sûr.",
-    attachActive: true,
-  },
-  { name: "/doc", hint: "documenter", prompt: "Documente ce code : une note au-dessus, dans la langue et le style du fichier.", attachActive: true },
-];
-
-function expandSlash(text: string): { text: string; attachActive: boolean } | undefined {
-  const match = SLASH.find((c) => text === c.name || text.startsWith(`${c.name} `));
-  if (!match) return undefined;
-  const extra = text.slice(match.name.length).trim();
-  return { text: extra ? `${match.prompt}\n\n${extra}` : match.prompt, attachActive: match.attachActive ?? false };
-}
-
-function composer(s: UiState): HTMLElement {
-  const wrap = el("div", "composer");
-
-  if (s.attachments.length) {
-    const chips = el("div", "chips");
-    for (const a of s.attachments) {
-      const chip = el("span", "chip removable", `${a.label} · ${formatTokens(a.tokens)}`);
-      chip.append(button("✕", "Retirer", () => send({ type: "removeAttachment", label: a.label }), "chip-x"));
-      chips.append(chip);
-    }
-    wrap.append(chips);
+  constructor(list: HTMLElement) {
+    this.root = el("article", "entry assistant streaming");
+    const head = el("div", "entry-head");
+    head.append(el("span", "entry-who", "Forge"));
+    head.append(el("span", "entry-meta pulse", "réfléchit…"));
+    this.root.append(head);
+    this.body = el("div", "entry-body");
+    this.root.append(this.body);
+    list.append(this.root);
   }
 
-  const area = el("textarea");
-  area.placeholder = streaming
-    ? "Réponse en cours…"
-    : "Posez votre question. « # » joint un fichier, « / » lance une commande. Entrée pour envoyer.";
-  area.rows = 3;
-  area.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" && !ev.shiftKey) {
-      ev.preventDefault();
-      submit(area);
+  appendText(chunk: string): void {
+    this.buffer += chunk;
+    if (!this.text) {
+      this.text = el("div", "live-text");
+      this.body.append(this.text);
     }
-  });
-  // `#` hands over to the editor's file picker: fuzzy matching and keyboard handling for free.
-  area.addEventListener("input", () => {
-    const value = area.value;
-    if (value.endsWith("#")) {
-      area.value = value.slice(0, -1);
-      send({ type: "attachMention", query: "" });
-    }
-    slashHints(hints, area);
-  });
-  wrap.append(area);
-
-  const hints = el("div", "slash-hints");
-  wrap.append(hints);
-
-  const row = el("div", "composer-row");
-  const agent = el("label", "toggle");
-  const box = el("input");
-  box.type = "checkbox";
-  box.checked = s.agentMode;
-  box.addEventListener("change", () => {
-    if (state) state.agentMode = box.checked;
-  });
-  agent.append(box, document.createTextNode(" mode agent"));
-  agent.title = "L'assistant peut lire le dépôt, modifier des fichiers et proposer des commandes — toujours avec votre accord.";
-  row.append(agent);
-
-  row.append(button("📎 fichier actif", "Joindre le fichier ou la sélection en cours", () => send({ type: "attachActive" }), "text"));
-  row.append(button("📁 parcourir", "Joindre d'autres fichiers", () => send({ type: "attachFile" }), "text"));
-
-  const spacer = el("div", "spacer");
-  row.append(spacer);
-
-  if (streaming) {
-    row.append(button("■ Arrêter", "Interrompre la réponse", () => send({ type: "stop" }), "primary"));
-  } else {
-    row.append(button("Envoyer", "Envoyer la question", () => submit(area), "primary"));
+    this.text.textContent = this.buffer;
   }
-  wrap.append(row);
-  return wrap;
-}
 
-function slashHints(container: HTMLElement, area: HTMLTextAreaElement): void {
-  container.textContent = "";
-  const value = area.value;
-  if (!value.startsWith("/")) return;
-  for (const c of SLASH.filter((c) => c.name.startsWith(value.split(" ")[0] ?? "/"))) {
-    const chip = button(`${c.name} — ${c.hint}`, c.hint, () => {
-      area.value = `${c.name} `;
-      area.focus();
-      container.textContent = "";
-    }, "text");
-    container.append(chip);
+  appendReasoning(chunk: string): void {
+    if (!this.thinking) {
+      const wrap = collapsible("Raisonnement", "");
+      const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
+      this.thinking = { wrap, body };
+      this.body.prepend(wrap);
+    }
+    this.thinking.body.textContent = (this.thinking.body.textContent ?? "") + chunk;
+  }
+
+  appendStatus(text: string, tool?: string, ok?: boolean): void {
+    const row = el("div", `step${ok === false ? " failed" : ""}`);
+    if (tool) {
+      row.append(icon(ok === false ? "cross" : "check", "step-ico"));
+      row.append(el("span", "step-tool", tool));
+    } else {
+      row.append(el("span", "step-ico dot", "·"));
+    }
+    row.append(el("span", "step-summary", text));
+    this.body.append(row);
+  }
+
+  appendError(message: string): void {
+    this.body.append(el("div", "error", message));
+  }
+
+  /** The approval card: four answers, because "yes" and "yes forever" are different decisions. */
+  appendApproval(id: string, tool: string, description: string, command?: string): void {
+    const card = el("div", "approval");
+    const head = el("div", "approval-head");
+    head.append(icon("shield", "approval-ico"));
+    head.append(el("span", undefined, "Autorisation demandée"));
+    card.append(head);
+    card.append(el("div", "approval-body", description));
+    if (command) card.append(el("pre", "approval-command", command));
+
+    const actions = el("div", "approval-actions");
+    const answer = (a: "once" | "session" | "always" | "no", label: string) => {
+      send({ type: "approve", id, answer: a });
+      card.replaceChildren(el("div", "approval-done", label));
+    };
+    actions.append(
+      button({ label: "Autoriser", className: "btn primary", onClick: () => answer("once", "Autorisé une fois.") }),
+      button({
+        label: "Toujours (cette conversation)",
+        className: "btn",
+        title: `Ne plus demander pour ${tool} jusqu'à la prochaine conversation`,
+        onClick: () => answer("session", "Autorisé pour cette conversation."),
+      }),
+      button({
+        label: "Toujours",
+        className: "btn",
+        title: "Écrire une règle permanente pour cette action",
+        onClick: () => answer("always", "Règle permanente enregistrée."),
+      }),
+      button({ label: "Refuser", className: "btn danger", onClick: () => answer("no", "Refusé.") }),
+    );
+    card.append(actions);
+    this.body.append(card);
+    scrollToEnd();
+  }
+
+  /** Replace the raw stream with rendered markdown once the turn ends. */
+  finish(): void {
+    if (this.text && this.buffer) {
+      const rendered = markdown(this.buffer, {
+        onCopy: (code) => send({ type: "copy", text: code }),
+        onInsert: (code) => send({ type: "insertCode", code }),
+        onApply: (code, language) => send({ type: "applyCode", code, language }),
+      });
+      this.text.replaceWith(rendered);
+      this.text = undefined;
+    }
+    this.root.classList.remove("streaming");
   }
 }
 
-function submit(area: HTMLTextAreaElement): void {
-  let text = area.value.trim();
-  if (!text || streaming) return;
-  const editing = area.dataset["editing"];
-  const expanded = expandSlash(text);
-  if (expanded) {
-    text = expanded.text;
-    // The command's own context: the file being edited, added exactly as the 📎 button would.
-    if (expanded.attachActive) send({ type: "attachActive" });
-  }
-  area.value = "";
-  if (editing) {
-    delete area.dataset["editing"];
-    send({ type: "editEntry", id: editing, text });
-    return;
-  }
-  send({ type: "send", text, agentMode: state?.agentMode ?? true });
-}
-
-// ── Live turn ────────────────────────────────────────────────────────────────────────────────
-
-function ensureStreamNode(): HTMLElement {
-  if (streamNode) return streamNode;
-  const list = document.querySelector(".transcript") ?? app;
-  const wrap = el("article", "entry assistant streaming");
-  const head = el("div", "entry-head");
-  head.append(el("span", "who", "Forge"));
-  head.append(el("span", "meta pulse", "…"));
-  wrap.append(head);
-  const body = el("div", "body live");
-  wrap.append(body);
-  list.append(wrap);
-  streamNode = body;
+function ensureLive(): LiveTurn {
+  if (live) return live;
+  const list = document.querySelector<HTMLElement>(".transcript") ?? app;
+  // The welcome block is not part of the conversation; it goes as soon as one starts.
+  list.querySelector(".welcome")?.remove();
+  live = new LiveTurn(list);
   scrollToEnd();
-  return body;
-}
-
-function statusLine(text: string): void {
-  const node = ensureStreamNode();
-  const line = el("div", "status", text);
-  node.append(line);
-  scrollToEnd();
-}
-
-function approvalCard(id: string, tool: string, description: string): void {
-  const node = ensureStreamNode();
-  const card = el("div", "approval");
-  card.append(el("div", "approval-head", "Autorisation demandée"));
-  card.append(el("div", "approval-body", description));
-  card.append(el("div", "approval-tool", tool));
-  const row = el("div", "approval-actions");
-  const answer = (approved: boolean) => {
-    send({ type: "approve", id, approved });
-    card.replaceChildren(el("div", "approval-done", approved ? "Autorisé." : "Refusé."));
-  };
-  row.append(button("Autoriser", "Autoriser cette action", () => answer(true), "primary"));
-  row.append(button("Refuser", "Refuser cette action", () => answer(false), "text"));
-  card.append(row);
-  node.append(card);
-  scrollToEnd();
+  return live;
 }
 
 function scrollToEnd(): void {
@@ -476,10 +319,6 @@ function scrollToEnd(): void {
   });
 }
 
-function formatTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)} k jetons` : `${n} jetons`;
-}
-
 // ── Messages from the extension ──────────────────────────────────────────────────────────────
 
 window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
@@ -487,44 +326,48 @@ window.addEventListener("message", (event: MessageEvent<ToPanel>) => {
   switch (m.type) {
     case "state":
       state = m.state;
-      streamNode = undefined;
       render();
       break;
     case "turnStart":
-      streaming = true;
-      streamNode = undefined;
+      setStreaming(true);
       render();
+      ensureLive();
       break;
     case "turnEnd":
-      streaming = false;
-      streamNode = undefined;
+      setStreaming(false);
+      live?.finish();
       break;
-    case "delta": {
-      const node = ensureStreamNode();
-      let tail = node.querySelector<HTMLElement>(".live-text");
-      if (!tail) {
-        tail = el("div", "live-text");
-        node.append(tail);
-      }
-      tail.textContent = (tail.textContent ?? "") + m.text;
+    case "delta":
+      ensureLive().appendText(m.text);
       scrollToEnd();
       break;
-    }
     case "reasoning":
-      break; // reasoning is not shown by default; the log has it
+      ensureLive().appendReasoning(m.text);
+      break;
     case "status":
-      statusLine(m.text);
+      ensureLive().appendStatus(m.text, m.tool, m.ok);
+      scrollToEnd();
       break;
     case "approval":
-      approvalCard(m.id, m.tool, m.description);
+      ensureLive().appendApproval(m.id, m.tool, m.description, m.command);
       break;
-    case "error": {
-      const node = ensureStreamNode();
-      node.append(el("div", "error", m.message));
-      streaming = false;
+    case "error":
+      ensureLive().appendError(m.message);
+      setStreaming(false);
       break;
-    }
+  }
+});
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") closeMenu();
+  // The editor's own find shortcut, applied to the conversation.
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "f" && state?.screen === "chat") {
+    ev.preventDefault();
+    searchOpen = true;
+    render();
+    document.querySelector<HTMLInputElement>(".search-input")?.focus();
   }
 });
 
 send({ type: "ready" });
+export { isStreaming };

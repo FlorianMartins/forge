@@ -57,7 +57,19 @@ construction plutôt que par vigilance. La boucle, elle, ignore :
 Un outil refusé ou en échec renvoie un **résultat** au modèle. Un appel sans résultat est une erreur
 de protocole chez la plupart des fournisseurs et un blocage silencieux chez les autres.
 
-### 3. Local d'abord, escalade consentie
+### 3. Le mode décide de l'outillage, pas le prompt
+
+`core/session/modes.ts`. Trois modes, et la différence entre eux est ce que l'assistant **peut**
+faire, pas à quel point il est malin : `chat` n'a aucun outil, `plan` n'a que les outils qui
+observent (liste blanche explicite : un outil neuf est sans pouvoir tant qu'il n'y est pas nommé),
+`agent` a tout. Un modèle en mode Plan qui déciderait d'écrire un fichier ne trouve aucun outil pour
+le faire. Le prompt ne fait que décrire le mode dans lequel il est déjà.
+
+Les permissions (`core/agent/permissions.ts`) sont la deuxième moitié : elles portent sur la
+**forme** de l'action, jamais sur une occurrence. Autoriser `npm test` n'autorise pas `npm publish`,
+et un refus l'emporte toujours sur une autorisation.
+
+### 4. Local d'abord, escalade consentie
 
 `core/router/route.ts`. La complétion, les embeddings et les corvées (titres, messages de commit)
 **ne s'escaladent jamais** : c'est le trafic fréquent, et c'est exactement ce qu'un modèle 7 B fait
@@ -65,7 +77,7 @@ bien. Une question de discussion s'escalade sur un signal explicite (contexte pl
 fenêtre locale, ou classe de question que les petits modèles ratent) et selon une politique :
 `never`, `ask` (défaut), `auto`. **Le routeur ne dépense jamais de lui-même.**
 
-### 4. Une carte, pas le territoire
+### 5. Une carte, pas le territoire
 
 `core/context/repomap.ts`. Les symboles de tête sont extraits par expressions régulières et non par
 un parseur. L'objection est juste — un regex n'est pas un parseur — et le compromis est assumé :
@@ -76,7 +88,7 @@ serveur de langage a déjà ouvert le fichier, ses symboles sont préférés.
 Le classement met en tête le fichier édité, ses voisins de dossier, ce qu'il importe et ce qui
 l'importe, puis les fichiers ouverts et récemment modifiés.
 
-### 5. Zéro dépendance à l'exécution
+### 6. Zéro dépendance à l'exécution
 
 Le SSE, le glob, le diff, l'estimation de jetons, le rendu Markdown du panneau : écrits à la main.
 Un assistant censé protéger une entreprise de la fuite de son code ne peut pas lui demander de faire
@@ -104,5 +116,8 @@ question  ─►  session.build()      transcript → messages (muets exclus, co
   l'extension existe pour éviter. La carte du dépôt plus une recherche ciblée couvrent le besoin.
 - **Pas de participant `chat` natif VS Code.** L'API dépendait de l'extension Copilot ; un panneau
   webview donne le contrôle total sur ce qui est affiché et ce qui est envoyé.
+- **Pas de police d'icônes.** Le panneau dessine ses icônes en SVG inline. La première version
+  utilisait des glyphes Unicode et la moitié s'affichait en carrés vides dans la police d'interface
+  de l'éditeur.
 - **Pas de télémétrie.** Aucune, même anonyme, même optionnelle. Le seul compteur est local :
   suggestions demandées / acceptées, dans l'infobulle de la barre d'état.

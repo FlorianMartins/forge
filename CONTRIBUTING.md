@@ -8,7 +8,7 @@ npm test            # construit les bundles puis lance la suite
 npm run watch       # reconstruction continue, puis F5 dans VS Code
 ```
 
-`F5` ouvre une fenêtre d'extension de développement. Le canal de sortie « Hivey Forge » raconte ce
+`F5` ouvre une fenêtre d'extension de développement. Le canal de sortie « Forge » raconte ce
 qui se passe.
 
 ## Ce qui est attendu d'un changement

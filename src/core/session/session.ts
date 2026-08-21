@@ -15,6 +15,7 @@
 // quality and the price of the next turn.
 
 import type { ChatMessage } from "../providers/types.js";
+import type { Mode } from "./modes.js";
 import { estimateTokens } from "../util/tokens.js";
 
 export type EntryRole = "user" | "assistant";
@@ -43,6 +44,10 @@ export interface Entry {
   pinned?: boolean;
   model?: string;
   usdCost?: number;
+  /** What the model thought before answering. Kept for the user, never sent back to the model. */
+  reasoning?: string;
+  /** The tools this answer ran, for the transcript and the audit trail. */
+  steps?: Array<{ tool: string; summary: string; ok: boolean }>;
   /** Set on an assistant entry that failed, so it is never replayed as if it were an answer. */
   error?: string;
 }
@@ -53,6 +58,8 @@ export interface SessionData {
   createdAt: number;
   updatedAt: number;
   entries: Entry[];
+  /** The mode the conversation was held in — shown and filtered on in the history. */
+  mode?: Mode;
 }
 
 export interface BuildOptions {
@@ -85,6 +92,7 @@ export class Session {
   readonly createdAt: number;
   updatedAt: number;
   entries: Entry[];
+  mode: Mode;
 
   constructor(data?: Partial<SessionData>) {
     this.id = data?.id ?? newId("s");
@@ -92,6 +100,7 @@ export class Session {
     this.createdAt = data?.createdAt ?? Date.now();
     this.updatedAt = data?.updatedAt ?? this.createdAt;
     this.entries = data?.entries ?? [];
+    this.mode = data?.mode ?? "agent";
   }
 
   add(entry: Omit<Entry, "id" | "at" | "included"> & Partial<Pick<Entry, "id" | "at" | "included">>): Entry {
@@ -161,7 +170,14 @@ export class Session {
   }
 
   toJSON(): SessionData {
-    return { id: this.id, title: this.title, createdAt: this.createdAt, updatedAt: this.updatedAt, entries: this.entries };
+    return {
+      id: this.id,
+      title: this.title,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      entries: this.entries,
+      mode: this.mode,
+    };
   }
 
   /**

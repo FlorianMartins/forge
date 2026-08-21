@@ -238,8 +238,8 @@ export function buildTools(deps: ToolDeps): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
       const terminal =
-        vscode.window.terminals.find((t) => t.name === "Hivey Forge") ??
-        vscode.window.createTerminal({ name: "Hivey Forge", cwd: root() });
+        vscode.window.terminals.find((t) => t.name === "Forge") ??
+        vscode.window.createTerminal({ name: "Forge", cwd: root() });
       terminal.show(true);
       terminal.sendText(command, true);
       ctx.report(`lancé : ${command}`);

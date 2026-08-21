@@ -2,7 +2,7 @@
 
 ## Signaler une faille
 
-Écrivez à **florian.martins@gmail.com** avec « hivey-forge » dans l'objet, ou ouvrez un
+Écrivez à **florian.martins@gmail.com** avec « forge » dans l'objet, ou ouvrez un
 *security advisory* privé sur GitHub. Merci de ne pas ouvrir d'issue publique avant correction.
 
 Réponse sous 72 h, correctif visé sous 14 jours pour ce qui permet une fuite de données ou une

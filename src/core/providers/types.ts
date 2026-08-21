@@ -26,14 +26,30 @@ export interface Usage {
   costUsd?: number;
 }
 
+/**
+ * How much thinking to buy before answering. Every provider spells this differently — OpenRouter
+ * takes an effort word, Anthropic takes a token budget, DeepSeek decides on its own — so the shape
+ * the extension speaks is the intent, and each provider translates it.
+ */
+export type ReasoningEffort = "none" | "low" | "medium" | "high";
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
   tools?: ToolSchema[];
+  reasoning?: ReasoningEffort;
   signal?: AbortSignal;
 }
+
+/** Token budgets for the providers that price thinking by the token rather than by the word. */
+export const THINKING_BUDGET: Record<ReasoningEffort, number> = {
+  none: 0,
+  low: 2048,
+  medium: 8192,
+  high: 24576,
+};
 
 export interface ToolSchema {
   name: string;

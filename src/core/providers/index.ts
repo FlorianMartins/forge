@@ -19,8 +19,8 @@ export interface ProviderConfig {
 }
 
 export const ATTRIBUTION = {
-  referer: "https://github.com/FlorianMartins/hivey-forge",
-  title: "Hivey Forge",
+  referer: "https://github.com/FlorianMartins/forge",
+  title: "Forge",
 };
 
 export function makeProvider(cfg: ProviderConfig): Provider {
