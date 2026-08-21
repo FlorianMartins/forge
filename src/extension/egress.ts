@@ -17,6 +17,7 @@
 // private is not a privacy feature.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { redactMessages, Vault, type Finding } from "../core/redaction/index.js";
 import type { ChatMessage } from "../core/providers/types.js";
 import { Budget, type SpendStore, type Spend } from "../core/router/budget.js";
@@ -93,12 +94,15 @@ export class EgressGate {
 
     if (hasSecret) {
       const proceed = await vscode.window.showWarningMessage(
-        `Forge : ce que vous êtes sur le point d'envoyer contient ${findings.filter((f) => f.kind === "secret").length} élément(s) ressemblant à un secret. Ils ont été remplacés par des marqueurs, mais rien ne remplace une relecture.`,
+        t(
+          "Forge: what you are about to send contains {0} item(s) shaped like a credential. They were replaced by markers, but nothing replaces reading it yourself.",
+          findings.filter((f) => f.kind === "secret").length,
+        ),
         { modal: true },
-        "Envoyer (marqueurs en place)",
-        "Annuler",
+        t("Send (markers in place)"),
+        t("Cancel"),
       );
-      if (proceed !== "Envoyer (marqueurs en place)") return undefined;
+      if (proceed !== t("Send (markers in place)")) return undefined;
     }
 
     const estimatedTokens = estimateMessageTokens(redacted);
@@ -123,15 +127,15 @@ export class EgressGate {
 
     const summary = summarise(findings);
     const answer = await vscode.window.showInformationMessage(
-      `Forge va envoyer ~${tokens} jetons à ${host} (${target.model}).` +
-        (summary ? ` Anonymisé : ${summary}.` : " Aucune donnée sensible détectée."),
+      t("Forge is about to send ~{0} tokens to {1} ({2}).", tokens, host, target.model) +
+        (summary ? t(" Pseudonymised: {0}.", summary) : t(" No sensitive data detected.")),
       { modal: true },
-      "Envoyer",
-      "Voir ce qui part",
-      "Annuler",
+      t("Send"),
+      t("See what leaves"),
+      t("Cancel"),
     );
-    if (answer === "Voir ce qui part") return false; // the preview command shows it; the user re-sends
-    if (answer !== "Envoyer") return false;
+    if (answer === t("See what leaves")) return false; // the preview command shows it; the user re-sends
+    if (answer !== t("Send")) return false;
 
     if (policy === "ask-once") {
       this.consented.add(key);

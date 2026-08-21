@@ -6,13 +6,16 @@
 
 import type { Tool } from "../agent/loop.js";
 import { AGENT_PROMPT, PLAN_PROMPT, SYSTEM_PROMPT } from "../prompts.js";
+import { t } from "../../shared/i18n.js";
 
 export type Mode = "chat" | "plan" | "agent";
 
+// Labels are read at call time rather than at module load, so the list follows the interface
+// language even when this module was imported before the host announced it.
 export const MODES: Array<{ id: Mode; label: string; hint: string }> = [
-  { id: "chat", label: "Discussion", hint: "Répond avec ce que vous joignez. Aucun accès au dépôt." },
-  { id: "plan", label: "Plan", hint: "Lit le dépôt et propose un plan. Ne modifie rien." },
-  { id: "agent", label: "Agent", hint: "Lit, modifie et propose des commandes — avec votre accord." },
+  { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
+  { id: "plan", label: "Plan", hint: t("Reads the repository and proposes a plan. Changes nothing.") },
+  { id: "agent", label: "Agent", hint: t("Reads, edits and proposes commands — with your approval.") },
 ];
 
 /** Tools that only observe. The allow-list is explicit: a new tool is powerless until named here. */

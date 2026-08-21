@@ -26,6 +26,7 @@ import { Session } from "../core/session/session.js";
 import { buildRepoMap } from "../core/context/repomap.js";
 import { buildCliTools } from "./tools.js";
 import { promptForMode, toolsForMode, MODES, type Mode } from "../core/session/modes.js";
+import { t } from "../shared/i18n.js";
 
 interface CliConfig {
   provider: ProviderId;
@@ -110,13 +111,15 @@ async function main(): Promise<void> {
 
   const rl: Interface = createInterface({ input: stdin, output: stdout });
 
-  console.log(C.bold("Forge") + C.dim(" — assistant de code souverain"));
+  console.log(C.bold("Forge") + C.dim(t(" — sovereign coding assistant")));
   console.log(
     C.dim(
-      `${cfg.model} via ${new URL(cfg.baseUrl).host} · mode ${cfg.mode} · ${isLocal ? C.green("local (coût nul)") : C.amber(`distant, anonymisation ${cfg.redaction}`)}`,
+      `${cfg.model} · ${new URL(cfg.baseUrl).host} · ${t("mode")} ${cfg.mode} · ${
+        isLocal ? C.green(t("local (no cost)")) : C.amber(t("remote, redaction {0}", cfg.redaction))
+      }`,
     ),
   );
-  console.log(C.dim("/aide pour les commandes, Ctrl+C pour quitter.\n"));
+  console.log(C.dim(t("/help for the commands, Ctrl+C to quit.") + "\n"));
 
   const oneOff = process.argv.slice(2).join(" ").trim();
   if (oneOff) {
@@ -151,40 +154,51 @@ async function main(): Promise<void> {
       case "help":
         console.log(
           [
-            "/nouveau         repartir d'une discussion vide",
-            "/contexte        ce que la prochaine question enverra",
-            "/muet <n>        retirer l'échange n du contexte (il reste affiché)",
-            "/rendre <n>      le remettre",
-            "/oublier <n>     le supprimer définitivement",
-            "/mode <nom>      chat (aucun outil), plan (lecture seule), agent (outils)",
-            "/modele <nom>    changer de modèle",
-            "/cout            dépense du jour",
-            "/quitter",
+            t("/new             start an empty conversation"),
+            t("/context         what the next question will send"),
+            t("/mute <n>        take exchange n out of the context (it stays on screen)"),
+            t("/unmute <n>      put it back"),
+            t("/forget <n>      delete it for good"),
+            t("/mode <name>     chat (no tools), plan (read-only), agent (tools)"),
+            t("/model <name>    switch model"),
+            t("/cost            today's spend"),
+            t("/quit"),
           ].join("\n"),
         );
         return false;
+      case "new":
       case "nouveau":
         session.entries.length = 0;
-        console.log(C.dim("discussion vide."));
+        console.log(C.dim(t("empty conversation.")));
         return false;
+      case "context":
       case "contexte": {
         session.entries.forEach((e, i) => {
-          const flag = e.included ? " " : C.dim("muet");
-          console.log(`${String(i).padStart(2)} ${e.role === "user" ? "vous" : "forge"} ${flag} ${e.text.slice(0, 70).replace(/\n/g, " ")}`);
+          const flag = e.included ? " " : C.dim(t("muted"));
+          console.log(`${String(i).padStart(2)} ${e.role === "user" ? t("you") : t("forge")} ${flag} ${e.text.slice(0, 70).replace(/\n/g, " ")}`);
         });
         return false;
       }
+      // Command words are what the user TYPES, so both languages are accepted and neither is
+      // translated: a `case` label that moves with the interface language is a command nobody can
+      // rely on.
+      case "mute":
+      case "unmute":
       case "muet":
       case "rendre": {
         const entry = session.entries[Number(arg)];
         if (!entry) {
-          console.log(C.red("numéro inconnu (voir /contexte)"));
+          console.log(C.red(t("unknown number (see /context)")));
           return false;
         }
-        session.setIncluded(entry.id, name === "rendre");
-        console.log(C.dim(`échange ${arg} ${name === "muet" ? "retiré du" : "remis dans le"} contexte.`));
+        const putBack = name === "rendre" || name === "unmute";
+        session.setIncluded(entry.id, putBack);
+        console.log(
+          C.dim(putBack ? t("exchange {0} put back into the context.", arg) : t("exchange {0} removed from the context.", arg)),
+        );
         return false;
       }
+      case "forget":
       case "oublier": {
         const entry = session.entries[Number(arg)];
         if (entry) session.drop(entry.id);
@@ -194,26 +208,29 @@ async function main(): Promise<void> {
         const wanted = MODES.find((m) => m.id === arg);
         if (wanted) mode = wanted.id;
         const current = MODES.find((m) => m.id === mode)!;
-        console.log(C.dim(`mode ${current.id} — ${current.hint}`));
-        if (!wanted) console.log(C.dim(`(modes : ${MODES.map((m) => m.id).join(", ")})`));
+        console.log(C.dim(t("mode {0} — {1}", current.id, current.hint)));
+        if (!wanted) console.log(C.dim(t("(modes: {0})", MODES.map((m) => m.id).join(", "))));
         return false;
       }
+      case "model":
       case "modele":
         if (arg) cfg.model = arg;
-        console.log(C.dim(`modèle : ${cfg.model}`));
+        console.log(C.dim(t("model: {0}", cfg.model)));
         return false;
+      case "cost":
       case "cout":
         console.log(
           isLocal
-            ? C.green("local : rien dépensé, par construction.")
-            : `aujourd'hui : $${budget.spentToday().toFixed(4)} sur ${cfg.budget.dailyUsd} · ${budget.callsToday()} appel(s)`,
+            ? C.green(t("local: nothing spent, by construction."))
+            : t("today: ${0} of {1} · {2} call(s)", budget.spentToday().toFixed(4), cfg.budget.dailyUsd, budget.callsToday()),
         );
         return false;
+      case "quit":
       case "quitter":
       case "exit":
         return true;
       default:
-        console.log(C.red(`commande inconnue : /${name}`));
+        console.log(C.red(t("unknown command: /{0}", String(name))));
         return false;
     }
   }
@@ -244,11 +261,13 @@ async function main(): Promise<void> {
         blockOnSecret: true,
       });
       outgoing = messages;
-      if (findings.length) console.log(C.dim(`anonymisé : ${vault.summary().map((s) => `${s.label}×${s.count}`).join(", ")}`));
+      if (findings.length) {
+        console.log(C.dim(t("pseudonymised: {0}", vault.summary().map((s) => `${s.label}×${s.count}`).join(", "))));
+      }
       if (hasSecret) {
-        const ok = (await rl.question(C.red("Un secret a été détecté et masqué. Envoyer quand même ? [o/N] "))).toLowerCase();
-        if (ok !== "o" && ok !== "oui") {
-          console.log(C.dim("annulé."));
+        const ok = (await rl.question(C.red(t("A credential was detected and masked. Send anyway? [y/N] ")))).toLowerCase();
+        if (ok !== "y" && ok !== "o" && ok !== "yes" && ok !== "oui") {
+          console.log(C.dim(t("cancelled.")));
           process.off("SIGINT", onSigint);
           return;
         }
@@ -257,7 +276,7 @@ async function main(): Promise<void> {
       const estimate = price ? (built.estimatedTokens * price.in * 1.25) / 1_000_000 : 0;
       const verdict = budget.check(estimate);
       if (!verdict.ok) {
-        console.log(C.red(`budget : ${verdict.message}`));
+        console.log(C.red(t("budget: {0}", verdict.message)));
         process.off("SIGINT", onSigint);
         return;
       }
@@ -286,8 +305,8 @@ async function main(): Promise<void> {
         },
         report: (m) => console.log(C.dim(`  ${m}`)),
         approve: async (req) => {
-          const answer = (await rl.question(`\n${C.amber("?")} ${req.description} — autoriser ? [o/N] `)).toLowerCase();
-          return answer === "o" || answer === "oui";
+          const answer = (await rl.question(`\n${C.amber("?")} ${req.description} — ${t("allow? [y/N]")} `)).toLowerCase();
+          return answer === "y" || answer === "o" || answer === "yes" || answer === "oui";
         },
         afterResponse: (t) => vault.restore(t),
       });
@@ -300,12 +319,12 @@ async function main(): Promise<void> {
         budget.record(cost.usd);
         console.log(
           C.dim(
-            `  ${result.usage.promptTokens}+${result.usage.completionTokens} jetons` +
-              (cost.known ? ` · $${cost.usd.toFixed(4)}` : " · coût inconnu"),
+            t("  {0}+{1} tokens", result.usage.promptTokens, result.usage.completionTokens) +
+              (cost.known ? ` · $${cost.usd.toFixed(4)}` : ` · ${t("unknown cost")}`),
           ),
         );
       }
-      if (result.stoppedBecause === "max-steps") console.log(C.amber("  (arrêté au nombre maximal d'étapes)"));
+      if (result.stoppedBecause === "max-steps") console.log(C.amber(t("  (stopped at the maximum number of steps)")));
     } catch (err) {
       console.log(C.red(`\n${(err as Error).message}`));
     } finally {

@@ -6,6 +6,7 @@
 // the user is having in the sidebar.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { runTurn } from "../core/agent/loop.js";
 import { isLocalEndpoint, redact, Vault } from "../core/redaction/index.js";
 import { headToTokens } from "../core/util/tokens.js";
@@ -27,8 +28,8 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     vscode.commands.registerCommand("forge.askAboutSelection", async () => {
       const item = deps.workspace.activeContext();
       const question = await vscode.window.showInputBox({
-        prompt: "Que voulez-vous savoir sur cette sélection ?",
-        placeHolder: "Explique ce que fait ce code / trouve le bug / écris un test",
+        prompt: t("What do you want to know about this selection?"),
+        placeHolder: t("Explain what this code does / find the bug / write a test"),
         ignoreFocusOut: true,
       });
       if (!question) return;
@@ -41,14 +42,14 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const range = editor.selection.isEmpty ? editor.document.lineAt(editor.selection.active.line).range : editor.selection;
       const original = editor.document.getText(range);
       const instruction = await vscode.window.showInputBox({
-        prompt: `Modifier ${relative(editor.document.uri)} (${range.end.line - range.start.line + 1} ligne(s))`,
-        placeHolder: "extraire une fonction, gérer l'erreur, ajouter les types…",
+        prompt: t("Edit {0} ({1} line(s))", relative(editor.document.uri), range.end.line - range.start.line + 1),
+        placeHolder: t("extract a function, handle the error, add the types…"),
         ignoreFocusOut: true,
       });
       if (!instruction) return;
 
       const replacement = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Forge : réécriture…", cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: t("Forge: rewriting…"), cancellable: true },
         (_p, token) =>
           oneShot(
             deps,
@@ -68,8 +69,8 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const cleaned = stripFence(replacement);
       await editor.edit((b) => b.replace(range, cleaned));
       // The user reviews it as a normal edit: it is in the undo stack and in the SCM diff.
-      void vscode.window.showInformationMessage("Modification appliquée — Ctrl+Z pour revenir.", "Voir le diff").then((c) => {
-        if (c === "Voir le diff") void vscode.commands.executeCommand("workbench.view.scm");
+      void vscode.window.showInformationMessage(t("Change applied — Ctrl+Z to undo."), t("See the diff")).then((c) => {
+        if (c === t("See the diff")) void vscode.commands.executeCommand("workbench.view.scm");
       });
     }),
 
@@ -77,16 +78,16 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const git = vscode.extensions.getExtension<GitExtensionApi>("vscode.git")?.exports?.getAPI(1);
       const repo = git?.repositories?.[0];
       if (!repo) {
-        void vscode.window.showWarningMessage("Aucun dépôt Git ouvert.");
+        void vscode.window.showWarningMessage(t("No Git repository is open."));
         return;
       }
       const diff: string = await repo.diff(true);
       if (!diff.trim()) {
-        void vscode.window.showWarningMessage("Rien dans l'index : `git add` d'abord.");
+        void vscode.window.showWarningMessage(t("Nothing staged: run `git add` first."));
         return;
       }
       const message = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.SourceControl, title: "Forge : message de commit…" },
+        { location: vscode.ProgressLocation.SourceControl, title: t("Forge: commit message…") },
         () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, 6000)),
       );
       if (message) repo.inputBox.value = stripFence(message).trim();
@@ -104,7 +105,7 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       const original = doc.getText(range);
 
       const replacement = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Forge : correction…", cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: t("Forge: fixing…"), cancellable: true },
         (_p, token) =>
           oneShot(
             deps,
@@ -122,14 +123,14 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
       );
       if (!replacement) return;
       await editor.edit((b) => b.replace(range, stripFence(replacement)));
-      void vscode.window.showInformationMessage("Correction appliquée — Ctrl+Z pour revenir.");
+      void vscode.window.showInformationMessage(t("Fix applied — Ctrl+Z to undo."));
     }),
 
     vscode.commands.registerCommand("forge.explainDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
       const doc = await vscode.workspace.openTextDocument(uri);
       const start = Math.max(0, diagnostic.range.start.line - 5);
       const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 5);
-      await deps.chat.focusWithPrompt(`Explique ce problème et propose la correction : « ${diagnostic.message} »`, {
+      await deps.chat.focusWithPrompt(t("Explain this problem and propose the fix: “{0}”", diagnostic.message), {
         kind: "diagnostic",
         label: `${relative(uri)}:${diagnostic.range.start.line + 1}`,
         body: doc.getText(new vscode.Range(start, 0, end, doc.lineAt(end).text.length)),
@@ -164,12 +165,12 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
     vscode.commands.registerCommand("forge.explainTerminalSelection", async () => {
       const selection = vscode.window.activeTerminal ? await copyTerminalSelection() : undefined;
       if (!selection?.trim()) {
-        void vscode.window.showWarningMessage("Sélectionnez d'abord du texte dans le terminal.");
+        void vscode.window.showWarningMessage(t("Select some text in the terminal first."));
         return;
       }
-      await deps.chat.focusWithPrompt("Explique cette sortie de terminal et propose la correction.", {
+      await deps.chat.focusWithPrompt(t("Explain this terminal output and propose the fix."), {
         kind: "terminal",
-        label: "sortie du terminal",
+        label: t("terminal output"),
         body: headToTokens(selection, 3000),
         untrusted: true,
       });

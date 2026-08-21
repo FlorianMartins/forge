@@ -82,7 +82,7 @@ test("the terminal client answers a one-shot question and streams the reply", as
 
   assert.equal(code, 0);
   assert.match(out, /Bonjour depuis le terminal\./);
-  assert.match(out, /local \(coût nul\)/, "a loopback endpoint is announced as local");
+  assert.match(out, /local \(no cost\)/, "a loopback endpoint is announced as local");
 });
 
 test("the repository map is built from the real working directory and sent as a cacheable prefix", async () => {

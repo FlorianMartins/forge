@@ -7,15 +7,16 @@
 
 import { button, el, icon, ICON } from "./dom.js";
 import type { ToExtension, UiPermissionRule, UiState } from "../shared/protocol.js";
+import { t } from "../shared/i18n.js";
 
 const TOOL_LABELS: Record<string, string> = {
-  read_file: "Lire un fichier",
-  list_files: "Lister les fichiers",
-  search_text: "Chercher dans le dépôt",
-  get_diagnostics: "Lire les diagnostics",
-  write_file: "Écrire un fichier",
-  edit_file: "Modifier un fichier",
-  run_command: "Exécuter une commande",
+  read_file: t("Read a file"),
+  list_files: t("List files"),
+  search_text: t("Search the repository"),
+  get_diagnostics: t("Read diagnostics"),
+  write_file: t("Write a file"),
+  edit_file: t("Edit a file"),
+  run_command: t("Run a command"),
 };
 
 const GRANTABLE = ["write_file", "edit_file", "run_command"];
@@ -25,29 +26,31 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
 
   wrap.append(
     el("p", "screen-lede",
-      "Par défaut, Forge lit sans demander et demande avant toute écriture ou commande. Ce que vous " +
-        "autorisez ici s'applique à la forme de l'action, jamais à une seule occurrence : autoriser " +
-        "« npm test » n'autorise pas « npm publish ».",
+      t(
+        "By default Forge reads without asking, and asks before every write and every command. What you " +
+          "allow here applies to the SHAPE of an action, never to one occurrence: allowing “npm test” " +
+          "does not allow “npm publish”.",
+      ),
     ),
   );
 
   const stored = state.permissions.filter((r) => !r.session);
   const session = state.permissions.filter((r) => r.session);
 
-  wrap.append(sectionTitle("Règles permanentes", "Écrites sur le disque, valables jusqu'à ce que vous les retiriez."));
+  wrap.append(sectionTitle(t("Permanent rules"), t("Written to disk, in force until you remove them.")));
   const list = el("div", "perm-list");
-  if (!stored.length) list.append(el("p", "empty", "Aucune règle : tout ce qui modifie est demandé."));
+  if (!stored.length) list.append(el("p", "empty", t("No rule: anything that changes is asked.")));
   for (const rule of stored) list.append(ruleRow(rule, send));
   wrap.append(list);
 
-  wrap.append(sectionTitle("Accordé pour cette conversation", "Oublié à la prochaine discussion."));
+  wrap.append(sectionTitle(t("Granted for this conversation"), t("Forgotten at the next conversation.")));
   const temp = el("div", "perm-list");
-  if (!session.length) temp.append(el("p", "empty", "Rien pour l'instant."));
+  if (!session.length) temp.append(el("p", "empty", t("Nothing yet.")));
   for (const rule of session) temp.append(ruleRow(rule, send));
   if (session.length) {
     temp.append(
       button({
-        label: "Tout révoquer",
+        label: t("Revoke all"),
         className: "btn tiny",
         onClick: () => send({ type: "clearSessionPermissions" }),
       }),
@@ -57,8 +60,8 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
 
   wrap.append(
     sectionTitle(
-      "Ajouter une règle permanente",
-      "« Autoriser » cesse de demander pour cette action ; « Refuser » la bloque sans la proposer.",
+      t("Add a permanent rule"),
+      t("“Allow” stops asking for that action; “Refuse” blocks it without offering it."),
     ),
   );
   const add = el("div", "perm-add");
@@ -68,15 +71,15 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
     row.append(el("div", "spacer"));
     row.append(
       button({
-        label: "Autoriser",
+        label: t("Allow"),
         className: "btn tiny",
-        title: "Cette action ne sera plus demandée, dans tous les espaces de travail",
+        title: t("This action will no longer be asked, in any workspace"),
         onClick: () => send({ type: "setPermission", tool, level: "always" }),
       }),
       button({
-        label: "Refuser",
+        label: t("Refuse"),
         className: "btn tiny danger",
-        title: "Cette action sera refusée sans être proposée",
+        title: t("This action will be refused without being offered"),
         onClick: () => send({ type: "setPermission", tool, level: "never" }),
       }),
     );
@@ -88,8 +91,10 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
     el(
       "p",
       "screen-note",
-      "Un refus l'emporte toujours sur une autorisation, et les chemins hors de l'espace de travail " +
-        "ou couverts par la politique de confidentialité restent interdits quelles que soient ces règles.",
+      t(
+        "A refusal always beats an authorisation, and paths outside the workspace — or covered by the " +
+          "privacy policy — stay forbidden whatever these rules say.",
+      ),
     ),
   );
   return wrap;
@@ -111,12 +116,12 @@ function ruleRow(rule: UiPermissionRule, send: (m: ToExtension) => void): HTMLEl
   if (rule.prefix) main.append(el("code", "perm-prefix", rule.prefix));
   row.append(main);
 
-  row.append(el("span", "perm-level", rule.session ? "cette conversation" : rule.level === "never" ? "refusé" : "autorisé"));
+  row.append(el("span", "perm-level", rule.session ? t("this conversation") : rule.level === "never" ? t("refused") : t("allowed")));
   if (!rule.session) {
     row.append(
       button({
         icon: ICON.trash,
-        title: "Retirer cette règle",
+        title: t("Remove this rule"),
         className: "btn icon-only",
         onClick: () => send({ type: "forgetPermission", tool: rule.tool, ...(rule.prefix ? { prefix: rule.prefix } : {}) }),
       }),

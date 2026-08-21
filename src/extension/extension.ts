@@ -2,6 +2,7 @@
 // its capabilities is one file long and a reviewer can read it in a minute.
 
 import * as vscode from "vscode";
+import { setLanguage, t } from "../shared/i18n.js";
 import { Budget } from "../core/router/budget.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
@@ -14,6 +15,12 @@ import { showEgressReport, showCostReport } from "./reports.js";
 import { WorkspaceContext } from "./workspace.js";
 
 export function activate(context: vscode.ExtensionContext): void {
+  // The editor knows which language the user reads, unless they said otherwise.
+  const applyLanguage = () => {
+    const choice = readSettings().language;
+    setLanguage(choice === "auto" ? vscode.env.language : choice);
+  };
+  applyLanguage();
   const log = vscode.window.createOutputChannel("Forge");
   const keys = new Keys(context.secrets);
   const disposables: vscode.Disposable[] = [];
@@ -37,6 +44,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration(SECTION)) return;
+      if (e.affectsConfiguration(`${SECTION}.language`)) {
+        applyLanguage();
+        // The panel's strings were built in the old language; rebuilding its HTML reloads it.
+        chat.reload();
+      }
       const s = readSettings();
       budget.setLimits(s.budget);
       completion.invalidateProvider();
@@ -56,33 +68,33 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("forge.setApiKey", async () => {
       const provider = await vscode.window.showQuickPick(
         [
-          { label: "openrouter", detail: "Passerelle multi-modèles" },
-          { label: "anthropic", detail: "API Claude" },
-          { label: "openai-compatible", detail: "Passerelle interne, Azure, LiteLLM…" },
-          { label: "local", detail: "Serveur local qui exige une clé (rare)" },
+          { label: "openrouter", detail: t("Multi-model gateway") },
+          { label: "anthropic", detail: t("Claude API") },
+          { label: "openai-compatible", detail: t("Internal gateway, Azure, LiteLLM…") },
+          { label: "local", detail: t("A local server that requires a key (rare)") },
         ],
-        { placeHolder: "Pour quel fournisseur ?" },
+        { placeHolder: t("Which provider?") },
       );
       if (!provider) return;
       const key = await vscode.window.showInputBox({
-        prompt: `Clé pour ${provider.label}. Elle est rangée dans le trousseau du système, jamais dans les réglages.`,
+        prompt: t("Key for {0}. It is stored in the system keychain, never in the settings.", provider.label),
         password: true,
         ignoreFocusOut: true,
       });
       if (!key) return;
       await keys.store(provider.label as never, key);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(`Forge : clé ${provider.label} enregistrée dans le trousseau.`);
+      void vscode.window.showInformationMessage(t("Forge: {0} key stored in the keychain.", provider.label));
     }),
 
     vscode.commands.registerCommand("forge.clearApiKey", async () => {
       const provider = await vscode.window.showQuickPick(["openrouter", "anthropic", "openai-compatible", "local"], {
-        placeHolder: "Quelle clé effacer ?",
+        placeHolder: t("Which key to clear?"),
       });
       if (!provider) return;
       await keys.delete(provider as never);
       completion.invalidateProvider();
-      void vscode.window.showInformationMessage(`Clé ${provider} effacée.`);
+      void vscode.window.showInformationMessage(t("{0} key cleared.", provider));
     }),
 
     // The chat model is chosen in the panel, where prices can be compared side by side; this
@@ -98,15 +110,15 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const provider = await providerFor(s, keys, id);
         models = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: `Forge : modèles servis par ${id}…` },
+          { location: vscode.ProgressLocation.Notification, title: t("Forge: models served by {0}…", id) },
           () => provider.listModels(),
         );
       } catch (err) {
-        void vscode.window.showErrorMessage(`Impossible de lister les modèles : ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(t("Cannot list the models: {0}", (err as Error).message));
         return;
       }
       const picked = await vscode.window.showQuickPick(models, {
-        placeHolder: "Modèle de complétion inline — un modèle de code, capable de remplissage au milieu",
+        placeHolder: t("Inline completion model — a code model that supports fill-in-the-middle"),
       });
       if (!picked) return;
       await vscode.workspace.getConfiguration(SECTION).update("completion.model", picked, vscode.ConfigurationTarget.Workspace);
@@ -122,12 +134,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("forge.indexWorkspace", async () => {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Forge : cartographie du dépôt…" },
+        { location: vscode.ProgressLocation.Notification, title: t("Forge: mapping the repository…") },
         async () => {
           workspace.invalidate();
           const map = await workspace.repoMap(readSettings().context.maxTokens, true);
           void vscode.window.showInformationMessage(
-            map ? `Carte du dépôt : ${map.files} fichiers, ${map.omitted} omis (budget de jetons).` : "Aucun dossier ouvert.",
+            map
+              ? t("Repository map: {0} files, {1} omitted (token budget).", map.files, map.omitted)
+              : t("No folder is open."),
           );
         },
       );
@@ -159,20 +173,23 @@ async function announce(context: vscode.ExtensionContext, log: vscode.OutputChan
   }
   const local = chatUrl ? isLocalEndpoint(chatUrl) : true;
   log.appendLine(
-    `[activation] discussion=${s.chat.provider} (${chatUrl || "non configuré"}, ${local ? "local" : "distant"}) ` +
-      `complétion=${s.completion.provider} anonymisation=${s.privacy.redaction}`,
+    `[activation] chat=${s.chat.provider} (${chatUrl || "not configured"}, ${local ? "local" : "remote"}) ` +
+      `completion=${s.completion.provider} redaction=${s.privacy.redaction} language=${vscode.env.language}`,
   );
   const KEY = "forge.announced";
   if (context.globalState.get<boolean>(KEY)) return;
   await context.globalState.update(KEY, true);
   const choice = await vscode.window.showInformationMessage(
     local
-      ? "Forge est actif. Tout reste sur votre machine : la complétion et la discussion parlent à votre serveur local."
-      : `Forge est actif. La discussion utilise ${safeHost(chatUrl)} ; ce qui sort est anonymisé et vous sera montré avant le premier envoi.`,
-    "Ouvrir les réglages",
-    "Compris",
+      ? t("Forge is active. Everything stays on your machine: completion and chat talk to your local server.")
+      : t(
+          "Forge is active. Chat uses {0}; what leaves is pseudonymised and will be shown to you before the first request.",
+          safeHost(chatUrl),
+        ),
+    t("Open the settings"),
+    t("Got it"),
   );
-  if (choice === "Ouvrir les réglages") {
+  if (choice === t("Open the settings")) {
     await vscode.commands.executeCommand("workbench.action.openSettings", SECTION);
   }
 }

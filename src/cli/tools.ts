@@ -12,6 +12,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { isBlockedPath } from "../core/util/glob.js";
+import { t } from "../shared/i18n.js";
 
 export interface CliToolOptions {
   cwd: string;
@@ -64,7 +65,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const path = safeResolve(opts, String(args["path"] ?? ""));
       const text = await readFile(path, "utf8");
-      ctx.report(`lu ${args["path"]}`);
+      ctx.report(t("read {0}", String(args["path"])));
       return { content: headToTokens(text, 6000) };
     },
   };
@@ -80,7 +81,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       const base = args["subdir"] ? safeResolve(opts, String(args["subdir"])) : opts.cwd;
       const out: string[] = [];
       await walk(base, opts.cwd, out, Math.min(Number(args["limit"] ?? 300), 1000));
-      ctx.report(`${out.length} fichier(s)`);
+      ctx.report(t("{0} file(s)", out.length));
       return { content: out.join("\n") || "(empty)" };
     },
   };
@@ -121,7 +122,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
           /* unreadable */
         }
       }
-      ctx.report(`${hits.length} occurrence(s)`);
+      ctx.report(t("{0} match(es)", hits.length));
       return { content: hits.join("\n") || "(no match)" };
     },
   };
@@ -136,7 +137,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
         required: ["path", "content"],
       },
     },
-    approval: (args) => `écrire ${String(args["path"])}`,
+    approval: (args) => t("write {0}", String(args["path"])),
     async run(args, ctx): Promise<ToolResult> {
       const rel = String(args["path"] ?? "");
       const path = safeResolve(opts, rel);
@@ -149,7 +150,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       }
       opts.showDiff(rel, before, content);
       await writeFile(path, content, "utf8");
-      ctx.report(`écrit ${rel}`);
+      ctx.report(t("wrote {0}", rel));
       return { content: `Wrote ${rel} (${content.split("\n").length} lines).` };
     },
   };
@@ -164,7 +165,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
         required: ["path", "old", "new"],
       },
     },
-    approval: (args) => `modifier ${String(args["path"])}`,
+    approval: (args) => t("edit {0}", String(args["path"])),
     async run(args, ctx): Promise<ToolResult> {
       const rel = String(args["path"] ?? "");
       const path = safeResolve(opts, rel);
@@ -179,7 +180,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
       const next = text.slice(0, at) + newText + text.slice(at + oldText.length);
       opts.showDiff(rel, text, next);
       await writeFile(path, next, "utf8");
-      ctx.report(`modifié ${rel}`);
+      ctx.report(t("edited {0}", rel));
       return { content: `Edited ${rel}.` };
     },
   };
@@ -194,7 +195,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
         required: ["command"],
       },
     },
-    approval: (args) => `exécuter \`${String(args["command"])}\``,
+    approval: (args) => t("run `{0}`", String(args["command"])),
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
       const timeout = Math.min(Number(args["timeoutMs"] ?? 120_000), 600_000);
@@ -219,7 +220,7 @@ export function buildCliTools(opts: CliToolOptions): Tool[] {
         child.on("close", (code) => {
           clearTimeout(timer);
           ctx.signal?.removeEventListener("abort", onAbort);
-          const tail = out.length > maxOut ? `…(début tronqué)\n${out.slice(-maxOut)}` : out;
+          const tail = out.length > maxOut ? `…(start truncated)\n${out.slice(-maxOut)}` : out;
           resolveResult({
             content: `exit code ${killed ? "killed (timeout)" : code}\n${tail || "(no output)"}`,
             isError: code !== 0,

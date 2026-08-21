@@ -6,28 +6,29 @@
 // "what did I ask it to plan". So: full-text search that looks inside the messages and shows the
 // matching fragment, a period, a mode, and a paid-only switch.
 
-import { button, el, ICON, relativeDate, searchInput } from "./dom.js";
+import { button, el, ICON, locale, relativeDate, searchInput } from "./dom.js";
 import type { ToExtension, UiHistoryFilter, UiHistoryRow, UiState } from "../shared/protocol.js";
+import { t } from "../shared/i18n.js";
 
 const PERIODS: Array<{ id: UiHistoryFilter["period"]; label: string }> = [
-  { id: "all", label: "Tout" },
-  { id: "today", label: "Aujourd'hui" },
-  { id: "week", label: "7 jours" },
-  { id: "month", label: "30 jours" },
+  { id: "all", label: t("All") },
+  { id: "today", label: t("Today") },
+  { id: "week", label: t("7 days") },
+  { id: "month", label: t("30 days") },
 ];
 
 const MODES: Array<{ id: UiHistoryFilter["mode"]; label: string }> = [
-  { id: "all", label: "Tous modes" },
-  { id: "agent", label: "Agent" },
-  { id: "plan", label: "Plan" },
-  { id: "chat", label: "Discussion" },
+  { id: "all", label: t("All modes") },
+  { id: "agent", label: t("Agent") },
+  { id: "plan", label: t("Plan") },
+  { id: "chat", label: t("Chat") },
 ];
 
 const SORTS: Array<{ id: UiHistoryFilter["sort"]; label: string }> = [
-  { id: "updated", label: "Modifiée récemment" },
-  { id: "created", label: "Créée récemment" },
-  { id: "messages", label: "La plus longue" },
-  { id: "cost", label: "La plus coûteuse" },
+  { id: "updated", label: t("Recently updated") },
+  { id: "created", label: t("Recently created") },
+  { id: "messages", label: t("Longest") },
+  { id: "cost", label: t("Most expensive") },
 ];
 
 export function historyScreen(state: UiState, send: (m: ToExtension) => void): HTMLElement {
@@ -38,7 +39,7 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   bar.append(
     searchInput({
       value: filter.query,
-      placeholder: "Rechercher dans les conversations…",
+      placeholder: t("Search the conversations…"),
       onInput: (query) => send({ type: "setHistoryFilter", filter: { query } }),
     }),
   );
@@ -68,10 +69,10 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   const row2 = el("div", "filter-row");
   row2.append(
     button({
-      label: "Payantes seulement",
+      label: t("Paid only"),
       ...(filter.paidOnly ? { icon: ICON.check } : {}),
       className: `chip-btn${filter.paidOnly ? " selected" : ""}`,
-      title: "Ne garder que les conversations qui ont coûté quelque chose",
+      title: t("Keep only conversations that cost something"),
       onClick: () => send({ type: "setHistoryFilter", filter: { paidOnly: !filter.paidOnly } }),
     }),
   );
@@ -85,7 +86,7 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
   select.addEventListener("change", () =>
     send({ type: "setHistoryFilter", filter: { sort: select.value as UiHistoryFilter["sort"] } }),
   );
-  row2.append(el("div", "spacer"), el("label", "sort-label", "Trier :"), select);
+  row2.append(el("div", "spacer"), el("label", "sort-label", t("Sort:")), select);
   bar.append(row2);
   wrap.append(bar);
 
@@ -96,8 +97,8 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
         "p",
         "empty",
         filter.query || filter.period !== "all" || filter.mode !== "all" || filter.paidOnly
-          ? "Aucune conversation ne correspond à ces filtres."
-          : "Aucune conversation enregistrée. Les discussions apparaissent ici dès le premier message.",
+          ? t("No conversation matches these filters.")
+          : t("No conversation saved yet. They appear here from the first message."),
       ),
     );
   }
@@ -109,7 +110,8 @@ export function historyScreen(state: UiState, send: (m: ToExtension) => void): H
     el(
       "div",
       "history-footer",
-      `${state.history.length} conversation(s)${total > 0 ? ` · ${total.toFixed(3)} $ au total` : " · aucun coût"}`,
+      t("{0} conversations", state.history.length) +
+        (total > 0 ? t(" · {0} $ in total", total.toFixed(3)) : t(" · no cost")),
     ),
   );
   return wrap;
@@ -126,17 +128,17 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
   const meta = el("div", "history-meta");
   meta.append(el("span", `mode-tag mode-${row.mode}`, modeLabel(row.mode)));
   meta.append(el("span", undefined, relativeDate(row.updatedAt)));
-  meta.append(el("span", undefined, `${row.messages} message${row.messages > 1 ? "s" : ""}`));
+  meta.append(el("span", undefined, t("{0} messages", row.messages)));
   if (row.usdCost > 0) meta.append(el("span", "history-cost", `${row.usdCost.toFixed(4)} $`));
   open.append(meta);
-  open.title = `Créée le ${new Date(row.createdAt).toLocaleString("fr-FR")}\nModifiée le ${new Date(row.updatedAt).toLocaleString("fr-FR")}`;
+  open.title = t("Created {0}", new Date(row.createdAt).toLocaleString(locale())) + "\n" + t("Updated {0}", new Date(row.updatedAt).toLocaleString(locale()));
   open.addEventListener("click", () => send({ type: "openSession", id: row.id }));
 
   wrap.append(open);
   wrap.append(
     button({
       icon: ICON.trash,
-      title: "Supprimer cette conversation",
+      title: t("Delete this conversation"),
       className: "btn icon-only",
       onClick: () => send({ type: "deleteSession", id: row.id }),
     }),
@@ -145,5 +147,5 @@ function historyRow(row: UiHistoryRow, state: UiState, send: (m: ToExtension) =>
 }
 
 function modeLabel(mode: UiHistoryRow["mode"]): string {
-  return mode === "agent" ? "Agent" : mode === "plan" ? "Plan" : "Discussion";
+  return mode === "agent" ? t("Agent") : mode === "plan" ? t("Plan") : t("Chat");
 }

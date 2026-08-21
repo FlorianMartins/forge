@@ -5,6 +5,8 @@
 // was written by a language model, and a model can be steered by a file it just read. A code block
 // containing `<img onerror=…>` must render as those characters and do nothing else.
 
+import { language, t } from "../shared/i18n.js";
+
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -209,7 +211,7 @@ export function searchInput(opts: {
     wrap.append(
       button({
         icon: ICON.close,
-        title: "Effacer",
+        title: t("Clear"),
         className: "btn icon-only",
         onClick: () => opts.onInput(""),
       }),
@@ -221,15 +223,20 @@ export function searchInput(opts: {
 /** `il y a 3 min`, `hier`, `12 mars` — dates a human reads without doing arithmetic. */
 export function relativeDate(at: number, now = Date.now()): string {
   const seconds = Math.round((now - at) / 1000);
-  if (seconds < 60) return "à l'instant";
+  if (seconds < 60) return t("just now");
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `il y a ${minutes} min`;
+  if (minutes < 60) return t("{0} min ago", minutes);
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `il y a ${hours} h`;
+  if (hours < 24) return t("{0} h ago", hours);
   const days = Math.round(hours / 24);
-  if (days === 1) return "hier";
-  if (days < 7) return `il y a ${days} jours`;
-  return new Date(at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  if (days === 1) return t("yesterday");
+  if (days < 7) return t("{0} days ago", days);
+  return new Date(at).toLocaleDateString(locale(), { day: "numeric", month: "short" });
+}
+
+/** The editor's locale, for anything Intl formats: dates, numbers, prices. */
+export function locale(): string {
+  return language() === "fr" ? "fr-FR" : "en-GB";
 }
 
 export function formatTokens(n: number): string {
@@ -238,7 +245,7 @@ export function formatTokens(n: number): string {
 
 /** Prices are per million tokens; below a cent they need three decimals to mean anything. */
 export function formatPrice(usd: number): string {
-  if (!usd) return "gratuit";
+  if (!usd) return t("free");
   if (usd < 1) return `${usd.toFixed(2)} $`;
   return `${usd.toFixed(usd < 10 ? 1 : 0)} $`;
 }

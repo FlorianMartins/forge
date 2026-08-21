@@ -7,6 +7,7 @@
 // enough for a large share of everyday fixes.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 
 export class ForgeCodeActions implements vscode.CodeActionProvider {
   static readonly kinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.RefactorRewrite];
@@ -19,20 +20,20 @@ export class ForgeCodeActions implements vscode.CodeActionProvider {
     const actions: vscode.CodeAction[] = [];
 
     for (const diagnostic of context.diagnostics.slice(0, 3)) {
-      const fix = new vscode.CodeAction(`Corriger avec Forge : ${short(diagnostic.message)}`, vscode.CodeActionKind.QuickFix);
+      const fix = new vscode.CodeAction(t("Fix with Forge: {0}", short(diagnostic.message)), vscode.CodeActionKind.QuickFix);
       fix.diagnostics = [diagnostic];
       fix.command = {
         command: "forge.fixDiagnostic",
-        title: "Corriger",
+        title: t("Fix"),
         arguments: [document.uri, diagnostic],
       };
       actions.push(fix);
 
-      const explain = new vscode.CodeAction("Expliquer ce problème", vscode.CodeActionKind.QuickFix);
+      const explain = new vscode.CodeAction(t("Explain this problem"), vscode.CodeActionKind.QuickFix);
       explain.diagnostics = [diagnostic];
       explain.command = {
         command: "forge.explainDiagnostic",
-        title: "Expliquer",
+        title: t("Explain"),
         arguments: [document.uri, diagnostic],
       };
       actions.push(explain);
@@ -40,8 +41,8 @@ export class ForgeCodeActions implements vscode.CodeActionProvider {
 
     if (!range.isEmpty) {
       for (const [title, instruction] of [
-        ["Écrire un test pour cette sélection", "Écris un test pour ce code, dans le style des tests déjà présents dans ce dépôt."],
-        ["Documenter cette sélection", "Ajoute une documentation concise au-dessus de ce code, dans la langue et le style du fichier."],
+        [t("Write a test for this selection"), t("Write a test for this code, in the style of the tests already in this repository.")],
+        [t("Document this selection"), t("Add concise documentation above this code, in the language and style of the file.")],
       ] as const) {
         const action = new vscode.CodeAction(title, vscode.CodeActionKind.RefactorRewrite);
         action.command = { command: "forge.askWith", title, arguments: [instruction] };

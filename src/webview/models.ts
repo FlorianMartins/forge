@@ -11,6 +11,7 @@
 
 import { button, el, formatContext, formatPrice, icon, searchInput } from "./dom.js";
 import type { ToExtension, UiModel, UiState } from "../shared/protocol.js";
+import { t } from "../shared/i18n.js";
 
 let query = "";
 
@@ -21,7 +22,7 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
   bar.append(
     searchInput({
       value: query,
-      placeholder: "Filtrer par nom ou éditeur…",
+      placeholder: t("Filter by name or vendor…"),
       onInput: (value) => {
         query = value;
         rerender();
@@ -30,10 +31,10 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
   );
   const actions = el("div", "filter-row");
   actions.append(
-    el("span", "muted", state.modelsLoading ? "Interrogation des points de terminaison…" : `${state.models.length} modèles`),
+    el("span", "muted", state.modelsLoading ? t("Querying the endpoints…") : t("{0} models", state.models.length)),
     el("div", "spacer"),
-    button({ label: "Actualiser", className: "btn tiny", onClick: () => send({ type: "refreshModels" }) }),
-    button({ label: "Réglages", className: "btn tiny", onClick: () => send({ type: "openSettings" }) }),
+    button({ label: t("Refresh"), className: "btn tiny", onClick: () => send({ type: "refreshModels" }) }),
+    button({ label: t("Settings"), className: "btn tiny", onClick: () => send({ type: "openSettings" }) }),
   );
   bar.append(actions);
   wrap.append(bar);
@@ -48,14 +49,14 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
 
   const list = el("div", "models-list");
   if (local.length) {
-    list.append(sectionTitle("Sur votre machine", "Coût nul, aucune donnée ne sort."));
+    list.append(sectionTitle(t("On your machine"), t("No cost, no data leaves.")));
     for (const m of local) list.append(modelRow(m, send));
   }
   if (remote.length) {
     list.append(
       sectionTitle(
-        "Distants",
-        "Prix en dollars par million de jetons. Ce qui part est anonymisé et compté dans le budget.",
+        t("Remote"),
+        t("Prices in dollars per million tokens. What leaves is pseudonymised and counted against the budget."),
       ),
     );
     // Cheapest first inside each vendor, vendors alphabetical: a comparison, not a catalogue dump.
@@ -71,7 +72,7 @@ export function modelsScreen(state: UiState, send: (m: ToExtension) => void, rer
     }
   }
   if (!matching.length) {
-    list.append(el("p", "empty", state.modelsLoading ? "Chargement…" : "Aucun modèle ne correspond."));
+    list.append(el("p", "empty", state.modelsLoading ? t("Loading…") : t("No model matches.")));
   }
   wrap.append(list);
   return wrap;
@@ -95,19 +96,20 @@ function modelRow(model: UiModel, send: (m: ToExtension) => void): HTMLElement {
   row.append(main);
 
   const stats = el("div", "model-stats");
-  stats.append(stat(formatContext(model.context), "contexte"));
+  stats.append(stat(formatContext(model.context), t("context")));
   if (model.local) {
-    stats.append(stat("gratuit", "local"));
+    stats.append(stat(t("free"), t("local")));
   } else {
-    stats.append(stat(formatPrice(model.inUsd), "entrée"));
-    stats.append(stat(formatPrice(model.outUsd), "sortie"));
-    if (model.cachedInUsd) stats.append(stat(formatPrice(model.cachedInUsd), "cache"));
+    stats.append(stat(formatPrice(model.inUsd), t("input")));
+    stats.append(stat(formatPrice(model.outUsd), t("output")));
+    if (model.cachedInUsd) stats.append(stat(formatPrice(model.cachedInUsd), t("cache")));
   }
   row.append(stats);
 
   row.title = model.local
-    ? "Modèle servi par un point de terminaison local : aucun coût, aucune sortie de données."
-    : `Entrée ${model.inUsd} $ / M · sortie ${model.outUsd} $ / M${model.cachedInUsd ? ` · cache ${model.cachedInUsd} $ / M` : ""}`;
+    ? t("Served by a local endpoint: no cost, and nothing leaves.")
+    : t("Input {0} $/M · output {1} $/M", model.inUsd, model.outUsd) +
+      (model.cachedInUsd ? t(" · cached {0} $/M", model.cachedInUsd) : "");
   row.addEventListener("click", () => send({ type: "setModel", model: model.id, provider: model.provider }));
   return row;
 }

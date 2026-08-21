@@ -10,6 +10,7 @@
 // it governs and a new tool cannot forget to have one.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import type { Tool, ToolResult } from "../core/agent/loop.js";
 import { headToTokens } from "../core/util/tokens.js";
 import { EgressGate } from "./egress.js";
@@ -61,7 +62,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
       const doc = await vscode.workspace.openTextDocument(uri);
-      ctx.report(`lu ${relative(uri)} (${doc.lineCount} lignes)`);
+        ctx.report(t("read {0} ({1} lines)", relative(uri), doc.lineCount));
       return { content: headToTokens(doc.getText(), MAX_READ_TOKENS) };
     },
   };
@@ -81,7 +82,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const glob = String(args["glob"] ?? "**/*");
       const limit = Math.min(Number(args["limit"] ?? 100), 300);
       const uris = await vscode.workspace.findFiles(glob, undefined, limit);
-      ctx.report(`${uris.length} fichier(s) pour ${glob}`);
+      ctx.report(t("{0} file(s) for {1}", uris.length, glob));
       return { content: uris.map(relative).join("\n") || "(no match)" };
     },
   };
@@ -121,7 +122,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
           /* unreadable file */
         }
       }
-      ctx.report(`${out.length} occurrence(s) de /${pattern}/`);
+      ctx.report(t("{0} match(es) for /{1}/", out.length, pattern));
       return { content: out.join("\n") || "(no match)" };
     },
   };
@@ -145,7 +146,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
           lines.push(`${relative(uri)}:${d.range.start.line + 1} ${sev}: ${d.message}`);
         }
       }
-      ctx.report(`${lines.length} diagnostic(s)`);
+      ctx.report(t("{0} diagnostic(s)", lines.length));
       return { content: lines.slice(0, 100).join("\n") || "No diagnostics." };
     },
   };
@@ -160,7 +161,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         required: ["path", "content"],
       },
     },
-    approval: (args) => `écrire ${String(args["path"])}`,
+    approval: (args) => t("write {0}", String(args["path"])),
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
       const content = String(args["content"] ?? "");
@@ -181,7 +182,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         edit.createFile(uri, { contents: new TextEncoder().encode(content), overwrite: false });
       }
       const ok = await vscode.workspace.applyEdit(edit);
-      ctx.report(`${existed ? "modifié" : "créé"} ${relative(uri)}`);
+      ctx.report(existed ? t("edited {0}", relative(uri)) : t("created {0}", relative(uri)));
       return ok
         ? { content: `Wrote ${relative(uri)} (${content.split("\n").length} lines).`, display: { uri: uri.toString() } }
         : { content: "The editor refused the edit.", isError: true };
@@ -199,7 +200,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         required: ["path", "old", "new"],
       },
     },
-    approval: (args) => `modifier ${String(args["path"])}`,
+    approval: (args) => t("edit {0}", String(args["path"])),
     async run(args, ctx): Promise<ToolResult> {
       const uri = resolve(String(args["path"] ?? ""), s());
       const oldText = String(args["old"] ?? "");
@@ -218,7 +219,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
       const edit = new vscode.WorkspaceEdit();
       edit.replace(uri, new vscode.Range(doc.positionAt(first), doc.positionAt(first + oldText.length)), newText);
       const ok = await vscode.workspace.applyEdit(edit);
-      ctx.report(`modifié ${relative(uri)}`);
+      ctx.report(t("edited {0}", relative(uri)));
       return ok ? { content: `Edited ${relative(uri)}.` } : { content: "The editor refused the edit.", isError: true };
     },
   };
@@ -234,7 +235,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         required: ["command"],
       },
     },
-    approval: (args) => `exécuter \`${String(args["command"])}\``,
+    approval: (args) => t("run `{0}`", String(args["command"])),
     async run(args, ctx): Promise<ToolResult> {
       const command = String(args["command"] ?? "");
       const terminal =
@@ -242,7 +243,7 @@ export function buildTools(deps: ToolDeps): Tool[] {
         vscode.window.createTerminal({ name: "Forge", cwd: root() });
       terminal.show(true);
       terminal.sendText(command, true);
-      ctx.report(`lancé : ${command}`);
+      ctx.report(t("started: {0}", command));
       // The output belongs to the user's terminal. Claiming to have read it would be a lie: the
       // shell integration API cannot return it reliably across every shell and platform.
       return {

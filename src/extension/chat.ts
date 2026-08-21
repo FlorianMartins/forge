@@ -7,6 +7,7 @@
 // it is deliberately the only place that knows about all of them.
 
 import * as vscode from "vscode";
+import { language, t } from "../shared/i18n.js";
 import { runTurn, type Tool } from "../core/agent/loop.js";
 import { Permissions, commandPrefix, type PermissionStore, type Rule } from "../core/agent/permissions.js";
 import { costOf, makeLookup, type Price } from "../core/router/pricing.js";
@@ -122,7 +123,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       `script-src 'nonce-${nonce}'`,
     ].join("; ");
     return `<!DOCTYPE html>
-<html lang="fr">
+<html lang="${language()}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -219,6 +220,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private savePrefs(): void {
     void this.ctx.globalState.update(PREFS_KEY, { mode: this.session.mode, reasoning: this.reasoning } satisfies Prefs);
+  }
+
+  /** Rebuild the panel after a change it cannot re-render on its own, such as the language. */
+  reload(): void {
+    if (!this.view) return;
+    this.view.webview.html = this.html(this.view.webview);
   }
 
   /** Open the panel on a given screen — used by the palette commands and by the tests. */
@@ -397,23 +404,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case "insertCode": {
           const ed = vscode.window.activeTextEditor;
           if (!ed) {
-            void vscode.window.showWarningMessage("Aucun éditeur actif où insérer ce code.");
+            void vscode.window.showWarningMessage(t("No active editor to insert this code into."));
             break;
           }
           await ed.edit((b) => b.replace(ed.selection, m.code));
           break;
         }
         case "applyCode": {
-          // "Appliquer" opens the block as a diff against the active file, so the user reviews it
+          // t("Apply") opens the block as a diff against the active file, so the user reviews it
           // in the editor's own diff view rather than trusting a button.
           const ed = vscode.window.activeTextEditor;
           if (!ed) {
-            void vscode.window.showWarningMessage("Ouvrez le fichier cible avant d'appliquer.");
+            void vscode.window.showWarningMessage(t("Open the target file before applying."));
             break;
           }
           const preview = ed.document.uri.with({ scheme: "forge-preview", query: String(Date.now()) });
           previewContents.set(preview.toString(), m.code);
-          await vscode.commands.executeCommand("vscode.diff", ed.document.uri, preview, `${relative(ed.document.uri)} ↔ proposition`);
+          await vscode.commands.executeCommand("vscode.diff", ed.document.uri, preview, t("{0} ↔ proposal", relative(ed.document.uri)));
           break;
         }
         case "copy":
@@ -454,7 +461,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       case "mention": {
         const files = await this.workspace.findFiles("", 100);
-        const picked = await vscode.window.showQuickPick(files, { placeHolder: "Quel fichier joindre ?" });
+        const picked = await vscode.window.showQuickPick(files, { placeHolder: t("Which file to attach?") });
         if (picked) await this.onMessage({ type: "attachPath", path: picked });
         return;
       }
@@ -475,7 +482,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.modelsLoading = false;
       this.sendState();
     }
-    if (force) this.post({ type: "status", text: `${this.models.length} modèles` });
+    if (force) this.post({ type: "status", text: t("{0} models", this.models.length) });
   }
 
   private async ask(text: string): Promise<void> {
@@ -508,7 +515,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const built = this.session.build({
       systemPrompt: promptForMode(mode) + workspaceNote(),
-      ambient: ambient ? `${ambient.text}\n\n(${ambient.files} fichiers cartographiés, ${ambient.omitted} omis)` : undefined,
+      ambient: ambient ? `${ambient.text}\n\n(${ambient.files} files mapped, ${ambient.omitted} omitted)` : undefined,
       maxTokens: settings.context.maxTokens,
       nonce,
     });
@@ -523,11 +530,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     let model = decision.model;
     if (decision.suggestEscalation) {
       const choice = await vscode.window.showInformationMessage(
-        `Cette question dépasse le modèle local (${decision.suggestEscalation.why}). L'envoyer à ${decision.suggestEscalation.model} ?`,
-        "Envoyer",
-        "Rester en local",
+        t(
+          "This question is beyond the local model ({0}). Send it to {1}?",
+          decision.suggestEscalation.why,
+          decision.suggestEscalation.model,
+        ),
+        t("Send"),
+        t("Stay local"),
       );
-      if (choice === "Envoyer") {
+      if (choice === t("Send")) {
         providerId = decision.suggestEscalation.provider;
         model = decision.suggestEscalation.model;
       }
@@ -543,7 +554,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       const prepared = await this.gate.prepare(built.messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
       if (!prepared) {
-        this.post({ type: "status", text: "Envoi annulé." });
+        this.post({ type: "status", text: t("Request cancelled.") });
         this.post({ type: "turnEnd" });
         return;
       }
@@ -552,7 +563,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const estimate = estimateCost(prepared.estimatedTokens, this.priceLookup(model));
         const verdict = this.gate.budget.check(estimate);
         if (!verdict.ok) {
-          this.post({ type: "error", message: `Budget : ${verdict.message}. Ajustez forge.budget ou restez en local.` });
+          this.post({
+            type: "error",
+            message: t("Budget: {0}. Adjust forge.budget or stay local.", verdict.message),
+          });
           this.post({ type: "turnEnd" });
           return;
         }
@@ -597,7 +611,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         beforeRequest: async (messages) => {
           if (isLocal) return messages;
           const again = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
-          if (!again) throw new Error("Envoi refusé : la suite du tour n'a pas été transmise.");
+          if (!again) throw new Error(t("Request refused: the rest of the turn was not sent."));
           return again.messages;
         },
         afterResponse: (t) => vault.restore(t),
@@ -629,7 +643,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (result.stoppedBecause === "max-steps") {
-        this.post({ type: "status", text: "Arrêté après le nombre maximal d'étapes." });
+        this.post({ type: "status", text: t("Stopped after the maximum number of steps.") });
       }
       this.persist();
     } catch (err) {
@@ -652,11 +666,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private askApproval(req: { tool: string; description: string; args: Record<string, unknown> }): Promise<boolean> {
     const decision = this.permissions.decide(req.tool, req.args);
     if (decision === "always" || decision === "session") {
-      this.post({ type: "status", text: `${req.description} — autorisé par une règle`, tool: req.tool, ok: true });
+      this.post({ type: "status", text: t("{0} — allowed by a rule", req.description), tool: req.tool, ok: true });
       return Promise.resolve(true);
     }
     if (decision === "never") {
-      this.post({ type: "status", text: `${req.description} — refusé par une règle`, tool: req.tool, ok: false });
+      this.post({ type: "status", text: t("{0} — refused by a rule", req.description), tool: req.tool, ok: false });
       return Promise.resolve(false);
     }
 
@@ -687,17 +701,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       "vscode.diff",
       original === undefined ? vscode.Uri.parse("untitled:nouveau") : uri,
       preview,
-      `${relative(uri)} — proposition de Forge`,
+      t("{0} — proposed by Forge", relative(uri)),
       { preview: true },
     );
     const answer = await vscode.window.showInformationMessage(
-      `Appliquer la modification de ${relative(uri)} ?`,
+      t("Apply the change to {0}?", relative(uri)),
       { modal: false },
-      "Appliquer",
-      "Refuser",
+      t("Apply"),
+      t("Refuse"),
     );
     previewContents.delete(preview.toString());
-    return answer === "Appliquer";
+    return answer === t("Apply");
   }
 }
 

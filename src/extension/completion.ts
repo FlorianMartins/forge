@@ -8,6 +8,7 @@
 // configuration goes to a model running on the same machine and costs nothing at all.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { complete, type CompletionContext as CoreCtx } from "../core/completion/engine.js";
 import { redact, Vault } from "../core/redaction/index.js";
 import { CompletionCache } from "../core/completion/cache.js";
@@ -129,7 +130,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
       const message = (err as Error).message;
       this.log.appendLine(`[completion] ${message}`);
       this.status.text = "$(warning) Forge";
-      this.status.tooltip = `Complétion indisponible : ${message}`;
+      this.status.tooltip = t("Completion unavailable: {0}", message);
       return undefined;
     }
   }
@@ -159,7 +160,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     const p = this.provider as (Provider & { warmup?: (m: string) => Promise<void> }) | undefined;
     if (!p?.warmup) return;
     this.status.text = "$(loading~spin) Forge";
-    this.status.tooltip = "Chargement du modèle local…";
+    this.status.tooltip = t("Loading the local model…");
     await p.warmup(settings.completion.model);
     this.updateStatus(settings);
   }
@@ -174,12 +175,12 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     this.status.text = on ? `$(sparkle) Forge${local ? "" : " ☁"}` : "$(circle-slash) Forge";
     this.status.tooltip = new vscode.MarkdownString(
       [
-        `**Forge** — complétion ${on ? "active" : "désactivée"}`,
+        `**Forge** — ${on ? t("completion on") : t("completion off")}`,
         "",
-        `Modèle : \`${settings.completion.model}\` (${local ? "local, coût nul" : "distant"})`,
-        `Suggestions demandées cette session : ${this.requested} · acceptées : ${this.accepted}`,
+        t("Model: `{0}` ({1})", settings.completion.model, local ? t("local, no cost") : t("remote")),
+        t("Suggestions requested this session: {0} · accepted: {1}", this.requested, this.accepted),
         "",
-        "Cliquer pour activer ou désactiver.",
+        t("Click to turn it on or off."),
       ].join("\n"),
     );
     this.status.command = "forge.toggleCompletions";

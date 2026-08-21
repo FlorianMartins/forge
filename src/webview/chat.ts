@@ -8,19 +8,20 @@
 
 import { button, closeMenu, el, formatTokens, icon, ICON, menu, menuItem, menuTitle, separator } from "./dom.js";
 import { markdown } from "./markdown.js";
+import { t } from "../shared/i18n.js";
 import type { Mode, Reasoning, ToExtension, UiEntry, UiState } from "../shared/protocol.js";
 
 const MODES: Array<{ id: Mode; label: string; hint: string }> = [
-  { id: "chat", label: "Discussion", hint: "Répond avec ce que vous joignez. Aucun accès au dépôt." },
-  { id: "plan", label: "Plan", hint: "Lit le dépôt et propose un plan. Ne modifie rien." },
-  { id: "agent", label: "Agent", hint: "Lit, modifie, propose des commandes — avec votre accord." },
+  { id: "chat", label: t("Chat"), hint: t("Answers from what you attach. No access to the repository.") },
+  { id: "plan", label: t("Plan"), hint: t("Reads the repository and proposes a plan. Changes nothing.") },
+  { id: "agent", label: t("Agent"), hint: t("Reads, edits, proposes commands — with your approval.") },
 ];
 
 const REASONING: Array<{ id: Reasoning; label: string; hint: string }> = [
-  { id: "none", label: "Direct", hint: "Aucun budget de réflexion. Le plus rapide, le moins cher." },
-  { id: "low", label: "Bref", hint: "Quelques centaines de jetons de réflexion." },
-  { id: "medium", label: "Standard", hint: "Pour du diagnostic et de la conception." },
-  { id: "high", label: "Approfondi", hint: "Pour les problèmes vraiment durs. Coûte le plus cher." },
+  { id: "none", label: t("Direct"), hint: t("No thinking budget. Fastest, cheapest.") },
+  { id: "low", label: t("Brief"), hint: t("A few hundred tokens of thinking.") },
+  { id: "medium", label: t("Standard"), hint: t("For diagnosis and design work.") },
+  { id: "high", label: t("Deep"), hint: t("For genuinely hard problems. Costs the most.") },
 ];
 
 export interface ChatDeps {
@@ -49,7 +50,7 @@ function transcript(state: UiState, deps: ChatDeps): HTMLElement {
     list.append(renderEntry(entry, state, deps));
   }
   if (state.searchQuery && !matches.size) {
-    list.append(el("p", "empty", `Aucun message ne contient « ${state.searchQuery} ».`));
+    list.append(el("p", "empty", t("No message contains “{0}”.", state.searchQuery)));
   }
   return list;
 }
@@ -62,8 +63,8 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
       "p",
       "welcome-lede",
       state.remote
-        ? "Le modèle choisi est distant : ce qui part est anonymisé et vous êtes prévenu avant le premier envoi."
-        : "Le modèle tourne sur votre machine. Rien de ce que vous écrivez ici ne quitte le réseau.",
+        ? t("The selected model is remote: what leaves is pseudonymised, and you are asked before the first request.")
+        : t("The model runs on your machine. Nothing you write here leaves the network."),
     ),
   );
 
@@ -78,12 +79,12 @@ function welcome(state: UiState, deps: ChatDeps): HTMLElement {
   w.append(cards);
 
   const tips = el("ul", "welcome-tips");
-  for (const t of [
-    "« # » joint un fichier · « / » ouvre les commandes · ⏎ envoie.",
-    "Une réponse ratée se retire du contexte sans disparaître de l'écran.",
-    "Le mode Agent demande votre accord avant chaque écriture ou commande.",
+  for (const tip of [
+    t("“#” attaches a file · “/” opens the commands · ⏎ sends."),
+    t("A bad answer can leave the context without leaving the screen."),
+    t("Agent mode asks for your approval before every write and every command."),
   ]) {
-    tips.append(el("li", undefined, t));
+    tips.append(el("li", undefined, tip));
   }
   w.append(tips);
   return w;
@@ -96,35 +97,35 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
   );
 
   const head = el("div", "entry-head");
-  head.append(el("span", "entry-who", entry.role === "user" ? "Vous" : "Forge"));
+  head.append(el("span", "entry-who", entry.role === "user" ? t("You") : "Forge"));
   if (entry.model && entry.role === "assistant") head.append(el("span", "entry-meta", entry.model));
   if (entry.usdCost) head.append(el("span", "entry-meta", `${entry.usdCost.toFixed(4)} $`));
-  if (!entry.included) head.append(el("span", "entry-tag", "hors contexte"));
-  if (entry.pinned) head.append(el("span", "entry-tag", "épinglé"));
+  if (!entry.included) head.append(el("span", "entry-tag", t("out of context")));
+  if (entry.pinned) head.append(el("span", "entry-tag", t("pinned")));
 
   const actions = el("div", "entry-actions");
   actions.append(
     button({
       icon: entry.included ? ICON.mute : ICON.unmute,
-      title: entry.included ? "Retirer du contexte — reste affiché, n'est plus envoyé" : "Remettre dans le contexte",
+      title: entry.included ? t("Remove from context — stays on screen, stops being sent") : t("Put back into the context"),
       className: "btn icon-only",
       onClick: () => deps.send({ type: "setIncluded", id: entry.id, included: !entry.included }),
     }),
     button({
       icon: ICON.pin,
-      title: entry.pinned ? "Ne plus épingler" : "Épingler — survit à la coupe quand le contexte est plein",
+      title: entry.pinned ? t("Unpin") : t("Pin — survives trimming when the context is full"),
       className: `btn icon-only${entry.pinned ? " active" : ""}`,
       onClick: () => deps.send({ type: "setPinned", id: entry.id, pinned: !entry.pinned }),
     }),
   );
   if (entry.role === "user") {
     actions.append(
-      button({ icon: ICON.edit, title: "Modifier et renvoyer", className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
+      button({ icon: ICON.edit, title: t("Edit and resend"), className: "btn icon-only", onClick: () => startEdit(entry, deps) }),
     );
   }
   actions.append(
-    button({ icon: ICON.copy, title: "Copier", className: "btn icon-only", onClick: () => deps.send({ type: "copy", text: entry.text }) }),
-    button({ icon: ICON.trash, title: "Supprimer définitivement", className: "btn icon-only", onClick: () => deps.send({ type: "dropEntry", id: entry.id }) }),
+    button({ icon: ICON.copy, title: t("Copy"), className: "btn icon-only", onClick: () => deps.send({ type: "copy", text: entry.text }) }),
+    button({ icon: ICON.trash, title: t("Delete permanently"), className: "btn icon-only", onClick: () => deps.send({ type: "dropEntry", id: entry.id }) }),
   );
   head.append(actions);
   wrap.append(head);
@@ -133,19 +134,19 @@ function renderEntry(entry: UiEntry, state: UiState, deps: ChatDeps): HTMLElemen
     const chips = el("div", "chips");
     for (const c of entry.context) {
       const chip = el("span", "chip", c.label);
-      chip.title = `${c.kind} · ~${formatTokens(c.tokens)} jetons`;
+      chip.title = t("{0} · ~{1} tokens", c.kind, formatTokens(c.tokens));
       chips.append(chip);
     }
     wrap.append(chips);
   }
 
-  if (entry.reasoning) wrap.append(collapsible("Raisonnement", entry.reasoning));
+  if (entry.reasoning) wrap.append(collapsible(t("Reasoning"), entry.reasoning));
   if (entry.steps?.length) wrap.append(stepList(entry.steps));
 
   if (entry.error) {
     wrap.append(el("div", "error", entry.error));
     wrap.append(
-      button({ label: "Réessayer", className: "btn tiny", onClick: () => deps.send({ type: "retry" }) }),
+      button({ label: t("Retry"), className: "btn tiny", onClick: () => deps.send({ type: "retry" }) }),
     );
   } else {
     wrap.append(
@@ -213,7 +214,7 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
       chip.append(
         button({
           icon: ICON.close,
-          title: "Retirer",
+          title: t("Remove"),
           className: "btn chip-x",
           onClick: () => deps.send({ type: "removeAttachment", label: a.label }),
         }),
@@ -227,10 +228,10 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   area.rows = 2;
   area.placeholder =
     state.mode === "agent"
-      ? "Décrivez le changement. « # » joint un fichier, « / » ouvre les commandes."
+      ? t("Describe the change. “#” attaches a file, “/” opens the commands.")
       : state.mode === "plan"
-        ? "Décrivez ce qu'il faut étudier. Forge lira le dépôt sans rien modifier."
-        : "Posez votre question. Joignez le contexte nécessaire : ce mode ne lit pas le dépôt.";
+        ? t("Describe what to investigate. Forge will read the repository without changing anything.")
+        : t("Ask your question. Attach the context you need: this mode does not read the repository.");
   area.addEventListener("input", () => {
     autoGrow(area);
     if (area.value.endsWith("#")) {
@@ -267,14 +268,14 @@ function composer(state: UiState, deps: ChatDeps): HTMLElement {
   rowBottom.append(contextButton(state, deps));
   rowBottom.append(el("div", "spacer"));
 
-  const tokens = el("span", "composer-tokens", `${formatTokens(state.contextTokens)} jetons`);
-  tokens.title = "Ce que la prochaine question enverra, une fois les échanges muets retirés.";
+  const tokens = el("span", "composer-tokens", t("{0} tokens", formatTokens(state.contextTokens)));
+  tokens.title = t("What the next question will send, once muted exchanges are removed.");
   rowBottom.append(tokens);
 
   rowBottom.append(
     isStreaming()
-      ? button({ icon: ICON.stop, title: "Interrompre la réponse", className: "btn primary", onClick: () => deps.send({ type: "stop" }) })
-      : button({ icon: ICON.send, title: "Envoyer (⏎)", className: "btn primary", onClick: () => submit(area, deps) }),
+      ? button({ icon: ICON.stop, title: t("Stop the answer"), className: "btn primary", onClick: () => deps.send({ type: "stop" }) })
+      : button({ icon: ICON.send, title: t("Send (⏎)"), className: "btn primary", onClick: () => submit(area, deps) }),
   );
   card.append(rowBottom);
   wrap.append(card);
@@ -302,33 +303,33 @@ export function isStreaming(): boolean {
 function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b = button({
     icon: ICON.attach,
-    label: "Contexte",
-    title: "Ajouter du contexte à la prochaine question",
+    label: t("Context"),
+    title: t("Add context to the next question"),
     className: "btn ghost",
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle("Ajouter au contexte"));
+        panel.append(menuTitle(t("Add to the context")));
         panel.append(
           menuItem({
-            label: "Fichier actif",
-            hint: "Le fichier ouvert, ou la sélection s'il y en a une",
+            label: t("Active file"),
+            hint: t("The open file, or the selection if there is one"),
             onClick: () => {
               deps.send({ type: "attach", what: "active" });
               close();
             },
           }),
           menuItem({
-            label: "Choisir un fichier…",
-            hint: "Sélecteur de VS Code, avec recherche floue",
+            label: t("Pick a file…"),
+            hint: t("VS Code's own picker, with fuzzy search"),
             onClick: () => {
               deps.send({ type: "attach", what: "mention" });
               close();
             },
           }),
           menuItem({
-            label: "Importer un fichier…",
-            hint: "Depuis le disque, même hors de l'espace de travail",
+            label: t("Import a file…"),
+            hint: t("From disk, even outside the workspace"),
             onClick: () => {
               deps.send({ type: "attach", what: "browse" });
               close();
@@ -337,11 +338,11 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
         );
 
         if (state.openFiles.length) {
-          panel.append(separator(), menuTitle(`Onglets ouverts (${state.openFiles.length})`));
+          panel.append(separator(), menuTitle(t("Open tabs ({0})", state.openFiles.length)));
           panel.append(
             menuItem({
-              label: "Tout joindre",
-              hint: "Les fichiers actuellement ouverts",
+              label: t("Attach all"),
+              hint: t("The files currently open"),
               onClick: () => {
                 deps.send({ type: "attach", what: "openFiles" });
                 close();
@@ -352,7 +353,7 @@ function contextButton(state: UiState, deps: ChatDeps): HTMLElement {
             panel.append(
               menuItem({
                 label: f.path,
-                detail: f.active ? "actif" : f.dirty ? "modifié" : "",
+                detail: f.active ? t("active") : f.dirty ? t("edited") : "",
                 onClick: () => {
                   deps.send({ type: "attachPath", path: f.path });
                   close();
@@ -372,12 +373,12 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b = button({
     label: current.label,
     trailingIcon: ICON.chevron,
-    title: `Mode : ${current.hint}`,
+    title: t("Mode: {0}", current.hint),
     className: `btn ghost mode mode-${state.mode}`,
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle("Ce que Forge a le droit de faire"));
+        panel.append(menuTitle(t("What Forge is allowed to do")));
         for (const m of MODES) {
           panel.append(
             menuItem({
@@ -394,8 +395,8 @@ function modeButton(state: UiState, deps: ChatDeps): HTMLElement {
         panel.append(
           separator(),
           menuItem({
-            label: "Permissions de l'agent…",
-            hint: "Ce qui est autorisé sans demander",
+            label: t("Agent permissions…"),
+            hint: t("What runs without asking"),
             onClick: () => {
               deps.send({ type: "openScreen", screen: "permissions" });
               close();
@@ -412,7 +413,7 @@ function modelButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b = button({
     label: state.modelLabel,
     trailingIcon: ICON.chevron,
-    title: state.remote ? "Modèle distant — cliquer pour comparer et changer" : "Modèle local — cliquer pour comparer et changer",
+    title: state.remote ? t("Remote model — click to compare and change") : t("Local model — click to compare and change"),
     className: `btn ghost model${state.remote ? " remote" : " local"}`,
     onClick: () => {
       closeMenu();
@@ -427,12 +428,12 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
   const b = button({
     label: current.label,
     trailingIcon: ICON.chevron,
-    title: `Raisonnement : ${current.hint}`,
+    title: t("Reasoning: {0}", current.hint),
     className: `btn ghost reasoning${state.reasoning === "none" ? "" : " active"}`,
     onClick: () =>
       menu(b, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle("Budget de réflexion"));
+        panel.append(menuTitle(t("Thinking budget")));
         for (const r of REASONING) {
           panel.append(
             menuItem({
@@ -453,11 +454,11 @@ function reasoningButton(state: UiState, deps: ChatDeps): HTMLElement {
 }
 
 const SLASH: Array<{ name: string; hint: string; prompt: string; attach?: boolean }> = [
-  { name: "/expliquer", hint: "expliquer le fichier ou la sélection", prompt: "Explique ce code : ce qu'il fait, comment il s'inscrit dans le reste, et ce qui mérite attention.", attach: true },
-  { name: "/tests", hint: "écrire des tests", prompt: "Écris des tests pour ce code, dans le style et avec les outils déjà utilisés dans ce dépôt. Couvre les cas limites.", attach: true },
-  { name: "/corriger", hint: "trouver et corriger le problème", prompt: "Trouve le défaut de ce code et corrige-le. Explique en une phrase ce qui n'allait pas.", attach: true },
-  { name: "/revue", hint: "revue : bugs, sécurité, lisibilité", prompt: "Fais la revue de ce code : bugs d'abord, puis sécurité, puis lisibilité. Ordonne par gravité, cite les lignes, ne signale rien dont tu ne sois pas sûr.", attach: true },
-  { name: "/doc", hint: "documenter", prompt: "Documente ce code : une note au-dessus, dans la langue et le style du fichier.", attach: true },
+  { name: t("/explain"), hint: t("explain the file or the selection"), prompt: t("Explain this code: what it does, how it fits into the rest, and what deserves attention."), attach: true },
+  { name: "/tests", hint: t("write tests"), prompt: t("Write tests for this code, in the style and with the tools already used in this repository. Cover the edge cases."), attach: true },
+  { name: t("/fix"), hint: t("find and fix the problem"), prompt: t("Find the defect in this code and fix it. Say in one sentence what was wrong."), attach: true },
+  { name: t("/review"), hint: t("review: bugs, security, readability"), prompt: t("Review this code: bugs first, then security, then readability. Order by severity, cite the lines, and report nothing you are unsure of."), attach: true },
+  { name: "/doc", hint: t("document"), prompt: t("Document this code: a note above it, in the language and style of the file."), attach: true },
 ];
 
 function slashHints(container: HTMLElement, area: HTMLTextAreaElement, deps: ChatDeps): void {

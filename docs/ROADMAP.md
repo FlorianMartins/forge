@@ -2,6 +2,15 @@
 
 Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas vérifié.
 
+## Fait (0.3.0)
+
+- **Localisation** : interface en anglais dans la source, français en traduction (une table pour le
+  panneau, l'extension et le CLI ; `package.nls.json` pour le manifeste). Suit la langue d'affichage
+  de VS Code. Deux tests tiennent le catalogue : l'un échoue sur une chaîne sans traduction, l'autre
+  sur une traduction devenue inutile.
+- Métadonnées de place de marché (catégories, mots-clés, bannière, changelog) et
+  `docs/PUBLISHING.md` : tout est prêt à publier, il manque les jetons.
+
 ## Fait (0.2.0)
 
 - Noyau indépendant de l'éditeur : anonymisation, fournisseurs, routeur, budget, complétion,
@@ -31,9 +40,10 @@ Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas v
 
 ## Pas encore fait
 
-- **Publication** sur le Marketplace VS Code et Open VSX.
-- **Localisation.** L'interface est en français en dur ; il faut passer par `package.nls.json` et
-  une table de chaînes (l'anglais d'abord).
+- **Publication** sur le Marketplace VS Code et Open VSX : préparée (`docs/PUBLISHING.md`), en
+  attente des jetons d'éditeur — que seul Florian peut créer.
+- **Autres langues** : la mécanique accepte n'importe quelle langue ; il n'y a que l'anglais et le
+  français pour l'instant.
 - **Qualité de génération mesurée.** Les tests de protocole utilisent un serveur factice ; la qualité et
   la latence des complétions avec `qwen2.5-coder:7b` n'ont pas pu être mesurées ici (machine sans
   GPU, charge moyenne > 100).

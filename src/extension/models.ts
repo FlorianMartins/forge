@@ -6,6 +6,7 @@
 // that cannot show them is a catalogue nobody uses.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { GENERATED_MODELS } from "../core/router/catalog.generated.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { UiModel } from "../shared/protocol.js";
@@ -54,7 +55,7 @@ export async function listModels(settings: Settings, keys: Keys, current: string
       out.push({
         id,
         name: id,
-        vendor: "passerelle",
+        vendor: t("gateway"),
         context: 0,
         inUsd: 0,
         outUsd: 0,

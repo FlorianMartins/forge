@@ -11,7 +11,14 @@ async function main(): Promise<void> {
       extensionDevelopmentPath: resolve(__dirname, "../../"),
       extensionTestsPath: resolve(__dirname, "./suite/index.js"),
       // No workspace, no telemetry, no other extension: whatever fails here is ours.
-      launchArgs: ["--disable-extensions", "--disable-gpu", "--disable-telemetry"],
+      launchArgs: [
+        "--disable-extensions",
+        "--disable-gpu",
+        "--disable-telemetry",
+        // FORGE_LOCALE=fr runs the whole suite in a French editor, which is the only way to prove
+        // the translation reaches a real user rather than only a unit test.
+        ...(process.env["FORGE_LOCALE"] ? ["--locale", process.env["FORGE_LOCALE"]] : []),
+      ],
     });
   } catch (err) {
     console.error("Integration tests failed:", err);

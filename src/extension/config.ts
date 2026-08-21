@@ -8,6 +8,7 @@
 //     provider at a public URL gets redaction and consent like any other remote provider.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { makeProvider, type Provider, type ProviderId } from "../core/providers/index.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import type { RedactionLevel, RedactionPolicy } from "../core/redaction/types.js";
@@ -16,6 +17,9 @@ import type { EscalationPolicy, RouterConfig } from "../core/router/route.js";
 export const SECTION = "forge";
 
 export interface Settings {
+  /** `auto` follows the editor; a fixed tag lets someone read the editor in one language and this
+   *  extension in another — which is more common than it sounds on shared machines. */
+  language: "auto" | "en" | "fr";
   chat: { provider: ProviderId; model: string };
   completion: { provider: ProviderId | "off"; model: string; enabled: boolean; debounceMs: number; maxTokens: number; multiline: boolean };
   endpoints: Record<ProviderId, string>;
@@ -37,6 +41,7 @@ export function readSettings(scope?: vscode.Uri): Settings {
   const level = c.get<RedactionLevel>("privacy.redaction", "strict");
   const allowUnredacted = c.get<boolean>("privacy.allowUnredacted", false);
   return {
+    language: c.get<"auto" | "en" | "fr">("language", "auto"),
     chat: {
       provider: c.get<ProviderId>("chat.provider", "local"),
       model: c.get<string>("chat.model", "qwen2.5-coder:7b"),
@@ -98,7 +103,7 @@ export function routerConfig(s: Settings): RouterConfig {
 export function endpointFor(s: Settings, id: ProviderId): string {
   const url = s.endpoints[id];
   if (url) return url;
-  throw new Error(`No endpoint configured for “${id}”. Set ${SECTION}.endpoints in the settings.`);
+  throw new Error(t("No endpoint configured for “{0}”. Set {1}.endpoints in the settings.", id, SECTION));
 }
 
 export class Keys {
@@ -127,7 +132,7 @@ export async function providerFor(s: Settings, keys: Keys, id: ProviderId): Prom
   const local = isLocalEndpoint(baseUrl);
   const apiKey = local && id === "local" ? undefined : await keys.get(id);
   if (!local && !apiKey && id !== "openai-compatible") {
-    throw new Error(`No API key stored for “${id}”. Run “Forge: Enregistrer une clé de fournisseur”.`);
+    throw new Error(t("No API key stored for “{0}”. Run “Forge: Store a provider key”.", id));
   }
   return makeProvider({ id, baseUrl, apiKey });
 }

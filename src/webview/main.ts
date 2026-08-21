@@ -12,6 +12,7 @@ import { modelsScreen } from "./models.js";
 import { permissionsScreen } from "./permissions.js";
 import { markdown } from "./markdown.js";
 import type { ToExtension, ToPanel, UiState } from "../shared/protocol.js";
+import { t } from "../shared/i18n.js";
 
 declare function acquireVsCodeApi(): { postMessage(m: unknown): void; getState(): unknown; setState(s: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -65,20 +66,20 @@ function header(s: UiState): HTMLElement {
     left.append(
       button({
         icon: ICON.back,
-        title: "Retour à la conversation",
+        title: t("Back to the conversation"),
         className: "btn icon-only",
         onClick: () => send({ type: "openScreen", screen: "chat" }),
       }),
     );
     left.append(el("span", "topbar-title", screenTitle(s)));
   } else {
-    const title = el("span", "topbar-title", s.session.title || "Nouvelle conversation");
+    const title = el("span", "topbar-title", s.session.title || t("New conversation"));
     title.title = s.session.title || "";
     left.append(title);
-    const badge = el("span", `badge ${s.remote ? "remote" : "local"}`, s.remote ? "distant" : "local");
+    const badge = el("span", `badge ${s.remote ? "remote" : t("local")}`, s.remote ? t("remote") : t("local"));
     badge.title = s.remote
-      ? "Fournisseur distant : ce qui part est anonymisé, et un journal des envois est tenu."
-      : "Fournisseur local : rien ne quitte votre machine ou votre réseau.";
+      ? t("Remote provider: what leaves is pseudonymised, and an egress log is kept.")
+      : t("Local provider: nothing leaves your machine or your network.");
     left.append(badge);
   }
 
@@ -87,7 +88,7 @@ function header(s: UiState): HTMLElement {
     right.append(
       button({
         icon: ICON.search,
-        title: "Rechercher dans cette conversation",
+        title: t("Search this conversation"),
         className: `btn icon-only${searchOpen ? " active" : ""}`,
         onClick: () => {
           searchOpen = !searchOpen;
@@ -100,13 +101,13 @@ function header(s: UiState): HTMLElement {
   right.append(
     button({
       icon: ICON.history,
-      title: "Historique des conversations",
+      title: t("Conversation history"),
       className: `btn icon-only${s.screen === "history" ? " active" : ""}`,
       onClick: () => send({ type: "openScreen", screen: "history" }),
     }),
     button({
       icon: ICON.add,
-      title: "Nouvelle conversation",
+      title: t("New conversation"),
       className: "btn icon-only",
       onClick: () => send({ type: "newSession" }),
     }),
@@ -114,25 +115,25 @@ function header(s: UiState): HTMLElement {
 
   const more = button({
     icon: ICON.more,
-    title: "Plus",
+    title: t("More"),
     className: "btn icon-only",
     onClick: () =>
       menu(more, (close) => {
         const panel = el("div", "menu-list");
-        panel.append(menuTitle("Confidentialité et coûts"));
+        panel.append(menuTitle(t("Privacy and cost")));
         panel.append(
           menuItem({
-            label: "Données sortantes",
-            hint: "Ce qui a quitté cette machine, sans le contenu",
+            label: t("Outgoing data"),
+            hint: t("What left this machine, without the content"),
             onClick: () => {
               send({ type: "openEgress" });
               close();
             },
           }),
           menuItem({
-            label: "Coûts et budget",
-            detail: s.budget.spentTodayUsd > 0 ? `${s.budget.spentTodayUsd.toFixed(3)} $` : "0 $",
-            hint: "Dépense du jour, par modèle",
+            label: t("Cost and budget"),
+            detail: `${s.budget.spentTodayUsd.toFixed(3)} $`,
+            hint: t("Today's spend, by model"),
             onClick: () => {
               send({ type: "openCosts" });
               close();
@@ -140,15 +141,15 @@ function header(s: UiState): HTMLElement {
           }),
           separator(),
           menuItem({
-            label: "Permissions de l'agent",
-            hint: "Ce qui est autorisé sans demander",
+            label: t("Agent permissions"),
+            hint: t("What runs without asking"),
             onClick: () => {
               send({ type: "openScreen", screen: "permissions" });
               close();
             },
           }),
           menuItem({
-            label: "Réglages de Forge",
+            label: t("Forge settings"),
             onClick: () => {
               send({ type: "openSettings" });
               close();
@@ -167,11 +168,11 @@ function header(s: UiState): HTMLElement {
 function screenTitle(s: UiState): string {
   switch (s.screen) {
     case "history":
-      return "Conversations";
+      return t("Conversations");
     case "models":
-      return "Modèles";
+      return t("Models");
     case "permissions":
-      return "Permissions";
+      return t("Permissions");
     default:
       return "Forge";
   }
@@ -182,7 +183,7 @@ function searchBar(s: UiState): HTMLElement {
   wrap.append(
     searchInput({
       value: s.searchQuery,
-      placeholder: "Rechercher dans cette conversation…",
+      placeholder: t("Search this conversation…"),
       onInput: (query) => send({ type: "search", query }),
       onEscape: () => {
         searchOpen = false;
@@ -191,7 +192,7 @@ function searchBar(s: UiState): HTMLElement {
     }),
   );
   if (s.searchQuery) {
-    wrap.append(el("span", "muted", `${s.matches.length} message(s)`));
+    wrap.append(el("span", "muted", t("{0} messages", s.matches.length)));
   }
   return wrap;
 }
@@ -209,7 +210,7 @@ class LiveTurn {
     this.root = el("article", "entry assistant streaming");
     const head = el("div", "entry-head");
     head.append(el("span", "entry-who", "Forge"));
-    head.append(el("span", "entry-meta pulse", "réfléchit…"));
+    head.append(el("span", "entry-meta pulse", t("thinking…")));
     this.root.append(head);
     this.body = el("div", "entry-body");
     this.root.append(this.body);
@@ -227,7 +228,7 @@ class LiveTurn {
 
   appendReasoning(chunk: string): void {
     if (!this.thinking) {
-      const wrap = collapsible("Raisonnement", "");
+      const wrap = collapsible(t("Reasoning"), "");
       const body = wrap.querySelector<HTMLElement>(".collapsible-body")!;
       this.thinking = { wrap, body };
       this.body.prepend(wrap);
@@ -256,7 +257,7 @@ class LiveTurn {
     const card = el("div", "approval");
     const head = el("div", "approval-head");
     head.append(icon("shield", "approval-ico"));
-    head.append(el("span", undefined, "Autorisation demandée"));
+    head.append(el("span", undefined, t("Approval requested")));
     card.append(head);
     card.append(el("div", "approval-body", description));
     if (command) card.append(el("pre", "approval-command", command));
@@ -267,20 +268,20 @@ class LiveTurn {
       card.replaceChildren(el("div", "approval-done", label));
     };
     actions.append(
-      button({ label: "Autoriser", className: "btn primary", onClick: () => answer("once", "Autorisé une fois.") }),
+      button({ label: t("Allow"), className: "btn primary", onClick: () => answer("once", t("Allowed once.")) }),
       button({
-        label: "Toujours (cette conversation)",
+        label: t("Always (this conversation)"),
         className: "btn",
-        title: `Ne plus demander pour ${tool} jusqu'à la prochaine conversation`,
-        onClick: () => answer("session", "Autorisé pour cette conversation."),
+        title: t("Stop asking for {0} until the next conversation", tool),
+        onClick: () => answer("session", t("Allowed for this conversation.")),
       }),
       button({
-        label: "Toujours",
+        label: t("Always"),
         className: "btn",
-        title: "Écrire une règle permanente pour cette action",
-        onClick: () => answer("always", "Règle permanente enregistrée."),
+        title: t("Write a permanent rule for this action"),
+        onClick: () => answer("always", t("Permanent rule saved.")),
       }),
-      button({ label: "Refuser", className: "btn danger", onClick: () => answer("no", "Refusé.") }),
+      button({ label: t("Refuse"), className: "btn danger", onClick: () => answer("no", t("Refused.")) }),
     );
     card.append(actions);
     this.body.append(card);

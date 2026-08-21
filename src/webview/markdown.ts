@@ -6,6 +6,7 @@
 // `default-src 'none'`, and a link that cannot be followed is better than one that exfiltrates.
 
 import { button, el, ICON } from "./dom.js";
+import { t } from "../shared/i18n.js";
 
 export interface CodeActions {
   onCopy(code: string): void;
@@ -144,14 +145,14 @@ function appendText(node: HTMLElement, text: string, highlight?: string): void {
 export function codeBlock(code: string, lang: string, actions?: CodeActions): HTMLElement {
   const wrap = el("div", "code-block");
   const head = el("div", "code-head");
-  head.append(el("span", "code-lang", lang || "texte"));
+  head.append(el("span", "code-lang", lang || t("text")));
 
   if (actions) {
     const tools = el("div", "code-tools");
     tools.append(
-      button({ icon: ICON.copy, title: "Copier ce bloc", className: "btn icon-only", onClick: () => actions.onCopy(code) }),
-      button({ label: "Insérer", title: "Remplacer la sélection dans l'éditeur", className: "btn tiny", onClick: () => actions.onInsert(code) }),
-      button({ label: "Comparer", title: "Ouvrir en diff avec le fichier actif", className: "btn tiny", onClick: () => actions.onApply(code, lang) }),
+      button({ icon: ICON.copy, title: t("Copy this block"), className: "btn icon-only", onClick: () => actions.onCopy(code) }),
+      button({ label: t("Insert"), title: t("Replace the selection in the editor"), className: "btn tiny", onClick: () => actions.onInsert(code) }),
+      button({ label: t("Compare"), title: t("Open as a diff against the active file"), className: "btn tiny", onClick: () => actions.onApply(code, lang) }),
     );
     head.append(tools);
   }

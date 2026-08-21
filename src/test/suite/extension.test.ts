@@ -24,6 +24,33 @@ suite("Forge", () => {
     assert.deepEqual(missing, [], `commands declared but not registered: ${missing.join(", ")}`);
   });
 
+  test("the interface language can be pinned independently of the editor", async () => {
+    const config = vscode.workspace.getConfiguration("forge");
+    await config.update("language", "fr", vscode.ConfigurationTarget.Global);
+    assert.equal(vscode.workspace.getConfiguration("forge").get("language"), "fr");
+    await config.update("language", undefined, vscode.ConfigurationTarget.Global);
+    assert.equal(vscode.workspace.getConfiguration("forge").get("language"), "auto", "the default follows the editor");
+  });
+
+  test("the manifest is localised: no unresolved %key% reaches the user", async () => {
+    // `package.nls.json` is resolved by VS Code when it loads the extension. If a key is missing
+    // from it, the raw `%command.x.title%` is what the command palette shows — which is the kind of
+    // defect that only appears once, in front of everyone.
+    const ext = vscode.extensions.getExtension(ID)!;
+    const raw: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === "string" && /^%.+%$/.test(value)) raw.push(value);
+      else if (Array.isArray(value)) value.forEach(walk);
+      else if (value && typeof value === "object") Object.values(value).forEach(walk);
+    };
+    walk(ext.packageJSON.contributes);
+    walk(ext.packageJSON.description);
+    assert.deepEqual(raw, [], `unresolved manifest keys: ${raw.join(", ")}`);
+
+    const commands = ext.packageJSON.contributes.commands as Array<{ title: string; category?: string }>;
+    assert.ok(commands.every((c) => c.title.length > 2));
+  });
+
   test("settings read back with the defaults the manifest declares", () => {
     const c = vscode.workspace.getConfiguration("forge");
     assert.equal(c.get("chat.provider"), "local");
@@ -71,8 +98,9 @@ suite("Forge", () => {
 
     const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>("vscode.executeCodeActionProvider", doc.uri, range);
     const titles = (actions ?? []).map((a) => a.title);
+    // The title is translated, so match on the product name rather than on one language's wording.
     assert.ok(
-      titles.some((t) => t.startsWith("Corriger avec Forge")),
+      titles.some((title) => title.includes("Forge")),
       `no Forge quick fix among: ${titles.join(" | ")}`,
     );
     collection.dispose();
@@ -92,6 +120,9 @@ suite("Screenshot", () => {
       const config = vscode.workspace.getConfiguration("forge");
       await config.update("endpoints.local", process.env["FORGE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
       await config.update("chat.model", "qwen2.5-coder:7b", vscode.ConfigurationTarget.Global);
+      // FORGE_LOCALE also drives the extension's own language setting, so the screenshots can show
+      // the translated interface without installing a VS Code language pack.
+      await config.update("language", process.env["FORGE_LOCALE"] ?? "auto", vscode.ConfigurationTarget.Global);
 
       const doc = await vscode.workspace.openTextDocument({
       language: "typescript",
@@ -112,7 +143,7 @@ suite("Screenshot", () => {
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
       await vscode.commands.executeCommand("forge.chat.focus");
       for (let i = 0; i < 10; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
-      await vscode.commands.executeCommand("forge.askWith", "Cette fonction arrondit-elle correctement ? Que corriger ?");
+      await vscode.commands.executeCommand("forge.askWith", "Does this function round correctly? What should change?");
       await new Promise((r) => setTimeout(r, 4000));
       await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
 

@@ -1,240 +1,216 @@
 # Forge
 
-**Un assistant de code pour VS Code qui ne fait pas sortir votre code.**
-Modèles locaux (Ollama, LM Studio, vLLM, llama.cpp) ou passerelle distante (OpenRouter, Azure,
-LiteLLM, Anthropic) — au choix, par rôle, et **anonymisé quand ça sort**.
+**A coding assistant for VS Code that does not send your code away.**
+Local models (Ollama, LM Studio, vLLM, llama.cpp) or a remote gateway (OpenRouter, Azure, LiteLLM,
+Anthropic) — your choice, per role, and **pseudonymised when it does leave**.
 
-Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télémétrie**.
+Open source (Apache-2.0), **zero runtime dependencies**, **zero telemetry**.
 
-![La barre latérale de Forge dans VS Code](docs/images/conversation.png)
+[Français](README.fr.md) · [Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md) ·
+[Threat model](docs/THREAT-MODEL.md)
 
-*Captures réelles, prises dans un VS Code lancé par la suite d'intégration. Seul le modèle qui
-répond est un serveur de test ; l'interface, elle, est le produit.*
+![Forge's sidebar in VS Code](docs/images/conversation.png)
 
-| Conversations | Modèles |
+*Real screenshots, taken from a VS Code launched by the integration suite. Only the model answering
+is a stub server; the interface is the product.*
+
+| Conversations | Models |
 |---|---|
-| ![Historique et filtres](docs/images/historique.png) | ![Comparateur de modèles](docs/images/modeles.png) |
+| ![History and filters](docs/images/historique.png) | ![Model comparison](docs/images/modeles.png) |
 
 ---
 
-## Pourquoi
+## Why
 
-GitHub Copilot est excellent et pose deux problèmes à une entreprise :
+GitHub Copilot is excellent, and it presents a company with two problems:
 
-1. **Le code part.** Chaque frappe, chaque fichier ouvert, chaque question part chez un tiers.
-   Pour beaucoup d'équipes — santé, défense, banque, sous-traitance sous NDA — ce point suffit à
-   fermer le dossier.
-2. **Le coût est structurel.** Le produit envoie tout à un gros modèle distant, parce que c'est le
-   produit. On paie par développeur, tous les mois, pour des complétions dont 90 % sont triviales.
+1. **The code leaves.** Every keystroke, every open file, every question goes to a third party. For
+   a lot of teams — health, defence, banking, subcontractors under NDA — that alone closes the file.
+2. **The cost is structural.** The product sends everything to one large remote model, because that
+   is the product. You pay per developer, every month, for completions that are 90 % trivial.
 
-Forge inverse les deux : **le défaut est le modèle qui tourne déjà sur votre machine**, le
-modèle distant est une **escalade** qu'il faut justifier, consentir et payer sur un budget ; et tout
-ce qui sort est **anonymisé de façon réversible** avant de partir.
+Forge inverts both: **the default is the model already running on your machine**, the remote one is
+an **escalation** that has to be justified, consented to, and paid for out of a budget; and anything
+that does leave is **reversibly pseudonymised** first.
 
-## Ce que ça sait faire
+## What it does
 
 | | |
 |---|---|
-| **Complétion inline** | Remplissage au milieu (FIM) avec le modèle de code local. Anti-rebond, annulation, cache « frappe à travers » qui sert la suite d'une suggestion **sans requête**. |
-| **Discussion en barre latérale** | Streaming, pièces jointes (fichier actif, sélection, fichiers choisis), historique par espace de travail, choix du modèle, compteur de contexte et de coût. |
-| **Mode agent** | L'assistant lit le dépôt, cherche, consulte les **diagnostics de l'éditeur**, modifie des fichiers et propose des commandes — **une approbation par action**, diff avant écriture, tout dans la pile d'annulation. |
-| **Terminal** | La commande `forge` : le même noyau, en REPL, avec la sortie des commandes réellement capturée et un diff imprimé avant chaque écriture. |
-| **Dans l'éditeur** | `Ctrl+I` réécrit la sélection sur place · clic droit → interroger la sélection · message de commit rédigé depuis l'index · « expliquer la sortie du terminal ». |
-| **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Forge » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
-| **Raccourcis de saisie** | `#` ouvre le sélecteur de fichiers de VS Code · `/expliquer`, `/tests`, `/corriger`, `/revue`, `/doc` joignent le fichier actif et posent la bonne question. |
-| **Trois modes** | **Discussion** (aucun outil), **Plan** (lit le dépôt, ne modifie rien), **Agent** (lit, modifie, propose des commandes). Le mode décide de l'outillage **dans le code** : en mode Plan, aucun outil d'écriture n'existe — ce n'est pas une consigne dans un prompt. |
-| **Raisonnement** | Budget de réflexion réglable (direct / bref / standard / approfondi), traduit pour chaque fournisseur — `reasoning.effort` chez OpenRouter, un budget de jetons chez Anthropic. Le texte de réflexion s'affiche dans un bloc repliable et n'est jamais renvoyé au modèle. |
-| **Permissions** | Par action et par forme d'action : « autoriser une fois », « pour cette conversation », « toujours ». Autoriser `npm test` n'autorise pas `npm publish`. Un écran dédié liste ce qui est permanent et ce qui expire. |
-| **Recherche** | Dans la conversation ouverte (`Ctrl+F`, résultats surlignés) **et** dans tout l'historique — la recherche regarde à l'intérieur des messages et montre le fragment qui correspond. |
-| **Filtres d'historique** | Période, mode, « payantes seulement », tri par dernière modification / création / longueur / coût. |
-| **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
-| **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
+| **Inline completion** | Fill-in-the-middle with your local code model. Debounced, cancellable, with a typed-through cache that serves the rest of a suggestion **with no request at all**. |
+| **Sidebar chat** | Streaming, attachments (active file, selection, chosen files), per-workspace history, model picker, context and cost meters. |
+| **Three modes** | **Chat** (no tools), **Plan** (reads the repository, changes nothing), **Agent** (reads, edits, proposes commands). The mode decides the tool set **in code**: in plan mode no writing tool exists — it is not an instruction in a prompt. |
+| **Agent mode** | Reads the repository, searches it, consults the **editor's diagnostics**, edits files and proposes commands — **one approval per action**, a diff before every write, everything in the undo stack. |
+| **Permissions** | Per action and per shape of action: “allow once”, “for this conversation”, “always”. Allowing `npm test` does not allow `npm publish`. A dedicated screen separates what is permanent from what expires. |
+| **Reasoning** | An adjustable thinking budget (direct / brief / standard / deep), translated per provider — `reasoning.effort` on OpenRouter, a token budget on Anthropic. The thinking is shown in a collapsed block and never sent back to the model. |
+| **Terminal** | The `forge` command: the same core in a REPL, with command output actually captured and a diff printed before every write. |
+| **In the editor** | `Ctrl+I` rewrites the selection in place · right-click → ask about the selection · commit message written from the staged diff · “explain the terminal output”. |
+| **Quick fixes** | On an error reported by your language server: “Fix with Forge” and “Explain this problem”. The compiler says **what** and **where**; the model only has to fix it — which is what makes a small local model enough for most everyday cases. |
+| **Search** | Inside the open conversation (`Ctrl+F`, matches highlighted) **and** across the whole history — the search looks inside the messages and shows the fragment that matched. |
+| **History filters** | Period, mode, “paid only”, and four sort orders (recently updated, created, longest, most expensive). |
+| **Context control** | Every exchange can be **muted** (stays on screen, stops being sent), **pinned** (survives trimming), edited or deleted. It is the most direct lever there is on both quality **and** cost. |
+| **Privacy** | Reversible pseudonymisation, blocked files, consent before the first destination, an **egress log** and a **cost report**. |
+| **Languages** | English and French, following the editor's display language — or pinned with `forge.language`, for a machine whose editor is in one language and whose user reads another. |
 
-## Comment le coût tend vers zéro
+## How the cost tends to zero
 
-Ce n'est pas un slogan, c'est une architecture. Cinq leviers, dans l'ordre de leur effet :
+Not a slogan — an architecture. Five levers, in order of effect:
 
-1. **La complétion ne s'escalade jamais.** C'est le trafic à haute fréquence — une requête par pause
-   de frappe. Elle tourne sur un modèle de code local (7 B suffit) et coûte de l'électricité.
-   Le routeur l'interdit d'escalade *quelle que soit* la politique configurée.
-2. **On envoie une carte, pas le territoire.** Le contexte ambiant est une **carte du dépôt**
-   (chemins + symboles de tête, extraits sans parseur natif), pas le contenu des fichiers. Quelques
-   milliers de jetons décrivent un dépôt cent fois plus gros, et le modèle demande les deux fichiers
-   qu'il lui faut au lieu qu'on lui en pousse quarante.
-3. **Le cache de prompt.** Le préfixe stable (prompt système + carte du dépôt) est marqué
-   `cache_control` sur Anthropic et bénéficie du cache implicite ailleurs. Une conversation de code
-   renvoie presque le même contexte à chaque tour : c'est là que se joue l'essentiel de la facture.
-4. **On ne demande pas quand c'est inutile.** Pas de requête au milieu d'un mot, ni devant du code
-   existant, ni pour un contexte dont on sait déjà que le modèle n'a rien à dire ; et la suite d'une
-   suggestion déjà obtenue est servie depuis le cache pendant que l'utilisateur la tape.
-5. **Un budget qui refuse.** Plafond par requête (une invite emballée ne coûte pas un dîner) et
-   plafond par jour, vérifiés **avant** l'appel sur une estimation, enregistrés **après** sur le coût
-   réel quand le fournisseur le communique (OpenRouter le fait).
+1. **Completion never escalates.** It is the high-frequency traffic — one request per pause in
+   typing. It runs on a local code model (7B is enough) and costs electricity. The router forbids
+   escalating it *whatever* the configured policy.
+2. **Send a map, not the territory.** The ambient context is a **repository map** (paths + top-level
+   symbols, extracted without a native parser), not file contents. A few thousand tokens describe a
+   repository a hundred times their size, and the model asks for the two files it needs instead of
+   being handed forty.
+3. **The prompt cache.** The stable prefix (system prompt + repository map) is marked with
+   `cache_control` on Anthropic and benefits from implicit caching elsewhere. A coding conversation
+   resends almost the same context every turn: that is where most of the bill is decided.
+4. **Do not ask when it is pointless.** No request mid-word, none in front of existing code, none
+   for a context the model already had nothing to say about; and the rest of a suggestion you are
+   typing through is served from the cache.
+5. **A budget that refuses.** A per-request cap (one runaway prompt cannot cost a dinner) and a
+   daily cap, checked **before** the call on an estimate, recorded **after** on the real cost when
+   the provider reports it (OpenRouter does).
 
-Résultat par défaut : **0 $**. Le premier centime dépensé est un choix explicite.
+Default result: **$0**. The first cent spent is an explicit choice.
 
-## Comment la confidentialité est tenue
+## How privacy is kept
 
-Quatre étapes, dans cet ordre, sur tout ce qui part vers un fournisseur distant :
+Four steps, in this order, on everything bound for a remote provider:
 
-1. **Interdiction.** Un fichier qui correspond à `privacy.blockedGlobs` (`.env`, clés, `secrets/**`…)
-   n'est jamais joint, ni en discussion, ni en complétion.
-2. **Anonymisation réversible.** Identifiants (formes connues + filet à entropie), adresses e-mail,
-   téléphones, IP, hôtes internes, comptes dans les chemins, et les **termes propres à votre
-   organisation** que vous listez. `alice@corp.fr` devient `⟨EMAIL_1⟩` — **partout et toujours le
-   même marqueur**, pour que le modèle puisse encore raisonner — et redevient `alice@corp.fr` chez
-   vous, y compris dans le code qu'il renvoie.
-3. **Refus.** Un secret détecté déclenche un avertissement modal ; il est de toute façon déjà
-   remplacé. L'anonymisation « off » ne s'applique jamais aux identifiants : la vie privée est une
-   préférence, un mot de passe n'en est pas une.
-4. **Consentement.** Avant la première requête vers une destination donnée : ce qui part (volume,
-   destination, modèle) et ce qui a été masqué.
+1. **Blocked.** A file matching `privacy.blockedGlobs` (`.env`, keys, `secrets/**`…) is never
+   attached, neither in chat nor in completion.
+2. **Reversible pseudonymisation.** Credentials (known shapes + an entropy safety net), e-mail
+   addresses, phone numbers, IP addresses, internal hosts, account names in paths, and the
+   **organisation-specific terms** you list. `alice@corp.fr` becomes `⟨EMAIL_1⟩` — **always the same
+   marker**, so the model can still reason — and becomes `alice@corp.fr` again on your machine,
+   including in the code it sends back.
+3. **Refused.** A detected credential raises a modal warning; it has already been replaced anyway.
+   The “off” level never applies to credentials: privacy is a preference, a password is not.
+4. **Consent.** Before the first request to a given destination: what leaves (volume, destination,
+   model) and what was masked.
 
-Ensuite, **la preuve** : `Forge : Aperçu des données sortantes` liste chaque envoi distant —
-horodatage, hôte, modèle, jetons, part servie par le cache, coût, catégories anonymisées. **Jamais
-le contenu** : un journal de ce qu'on voulait garder privé n'est pas une fonction de confidentialité.
+Then, **the proof**: `Forge: Show outgoing data` lists every remote request — timestamp, host,
+model, tokens, share served from cache, cost, redaction categories. **Never the content**: a log of
+what you were trying to keep private is not a privacy feature.
 
-Les points où d'autres se trompent, et qui sont traités ici :
+The places where others get this wrong, and which are handled here:
 
-- **Le point de terminaison décide, pas le nom du réglage.** Pointer le fournisseur « local » vers
-  une URL publique déclenche l'anonymisation et le consentement comme n'importe quel autre.
-- **Chaque étape de l'agent repasse la porte.** Un fichier que l'agent vient de lire est du texte
-  neuf : il est ré-anonymisé avant l'appel suivant.
-- **Le contenu joint est cloisonné.** Fichiers, journaux et pages arrivent dans un bloc clos par un
-  **nonce par tour** ; une injection cachée dans un fichier ne peut pas fermer un bloc dont elle
-  ignore le délimiteur.
-- **Les clés vivent dans le trousseau du système** (`SecretStorage`), jamais dans `settings.json`
-  — qui se synchronise et se committe par accident.
+- **The endpoint decides, not the setting name.** Pointing the “local” provider at a public URL
+  triggers pseudonymisation and consent like any other.
+- **Every agent step goes through the gate again.** A file the agent just read is new text: it is
+  pseudonymised again before the next call.
+- **Attached content is fenced.** Files, logs and pages arrive inside a block closed by a
+  **per-turn nonce**; an injection hidden in a file cannot close a block whose delimiter it cannot
+  guess.
+- **Keys live in the OS keychain** (`SecretStorage`), never in `settings.json` — which syncs, and
+  gets committed by accident.
 
-## Installation
+## Install
+
+From the VS Code Marketplace: search for **Forge** (publisher `hivey`).
+
+From source:
 
 ```bash
 git clone https://github.com/FlorianMartins/forge
 cd forge
 npm ci
 npm run build
-npx @vscode/vsce package --no-dependencies   # produit forge.vsix
+npx @vscode/vsce package --no-dependencies   # produces forge.vsix
 code --install-extension forge.vsix
 ```
 
-Côté modèle, le plus simple :
+For the model, the simplest setup:
 
 ```bash
-ollama pull qwen2.5-coder:7b   # complétion + discussion, ~5 Go
+ollama pull qwen2.5-coder:7b   # completion + chat, ~5 GB
 ollama serve
 ```
 
-Rien d'autre à configurer : les valeurs par défaut visent `http://127.0.0.1:11434/v1`.
+Nothing else to configure: the defaults point at `http://127.0.0.1:11434/v1`.
 
-Pour ajouter une escalade distante : `Forge : Enregistrer une clé de fournisseur`, puis
-renseigner `forge.escalation.model` (par exemple `anthropic/claude-sonnet-4.5`).
+To add a remote escalation: `Forge: Store a provider key`, then set `forge.escalation.model` (for
+example `anthropic/claude-sonnet-4.5`).
 
-### Le client terminal
+### The terminal client
 
 ```bash
-npm link            # met `forge` dans le PATH
-forge               # REPL dans le dossier courant
-forge "pourquoi ce test est instable ?"   # question unique
+npm link            # puts `forge` on the PATH
+forge               # REPL in the current directory
+forge "why is this test flaky?"   # one-shot question
 ```
 
-Configuration par `.forge.json` (dossier courant, puis `~`) — un projet peut donc committer
-sa configuration d'équipe sans committer de clé (`apiKeyEnv` nomme la variable d'environnement).
+Configuration comes from `.forge.json` (working directory, then `~`), so a project can commit its
+team configuration without committing a key (`apiKeyEnv` names the environment variable).
 
-Une session, dans les grandes lignes (l'échange est un exemple, la mise en forme est celle du
-client) :
+REPL commands: `/context` lists the exchanges, `/mute 3` takes one out of the context without
+deleting it, `/forget 3` deletes it, `/mode` switches between chat, plan and agent, `/cost` shows
+the day's spend. From the editor, `Forge: Open Forge in the terminal` starts it with the same
+configuration as the sidebar.
 
-```
-Forge — assistant de code souverain
-qwen2.5-coder:7b via 127.0.0.1:11434 · local (coût nul)
-/aide pour les commandes, Ctrl+C pour quitter.
+## Enterprise deployment
 
-› cette fonction arrondit-elle correctement ?
-  lu src/facturation/total.ts
-La fonction ne comporte aucun arrondi : le résultat est un flottant, et sur une facture
-cela produit des écarts d'un centime que la comptabilité refuse.
-[…]
-? modifier src/facturation/total.ts — autoriser ? [o/N] o
-
-  src/facturation/total.ts
-  - return ht * (1 + tauxTVA);
-  + return Math.round(htCentimes * (1 + tauxTVA)) / 100;
-
-? exécuter `npm test` — autoriser ? [o/N] o
-  $ npm test
-```
-
-Les commandes du REPL : `/contexte` liste les échanges, `/muet 3` en retire un du contexte sans
-l'effacer, `/oublier 3` le supprime, `/agent` bascule outils actifs / discussion seule, `/cout`
-donne la dépense du jour. Depuis l'éditeur, `Forge : Ouvrir Forge dans le terminal` le lance
-avec la même configuration que la barre latérale.
-
-## Déploiement en entreprise
-
-- Servez un modèle une fois pour tous : **vLLM** ou **Ollama** derrière une URL interne, et poussez
-  `forge.endpoints.local` par la stratégie de réglages VS Code.
-- Verrouillez ce qui doit l'être : `privacy.blockedGlobs`, `privacy.customTerms` (noms de clients,
-  de projets), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
-- Les réglages `forge.*` sont validés par espace de travail : un dépôt sensible peut imposer
-  `chat.provider: "local"` dans son `.vscode/settings.json`.
-- L'extension n'embarque **aucune dépendance à l'exécution** : le paquet à auditer, c'est le bundle
-  et rien d'autre. Le SBOM est publié à chaque CI.
+- Serve one model for everyone: **vLLM** or **Ollama** behind an internal URL, and push
+  `forge.endpoints.local` through VS Code's settings policy.
+- Lock down what needs it: `privacy.blockedGlobs`, `privacy.customTerms` (client and project
+  names), `privacy.egressPolicy: "ask-always"`, `budget.dailyUsd`.
+- `forge.*` settings are workspace-scoped: a sensitive repository can force `chat.provider: "local"`
+  in its own `.vscode/settings.json`.
+- The extension ships **no runtime dependency**: what you audit is the bundle and nothing else. An
+  SBOM is published on every CI run.
 
 ## Architecture
 
 ```
-src/core/         aucun import de `vscode` — testable sans éditeur
-  redaction/      détecteurs, coffre de pseudonymes, politique
-  providers/      OpenAI-compatible (Ollama, vLLM, LiteLLM, OpenRouter…) + Anthropic natif
-  router/         local d'abord, escalade consentie, prix, budget
-  completion/     FIM par famille de modèle, cache, nettoyage des réponses
-  context/        carte du dépôt, symboles, imports
-  session/        le transcript, le prompt qui en est dérivé, les modes et l'historique
-  agent/          la boucle outils, et le registre des permissions
-src/extension/    la couche VS Code (barre latérale, complétion, commandes, porte de sortie)
-src/cli/          le client terminal
-src/webview/      le panneau : écrans conversation / historique / modèles / permissions,
-                  icônes SVG dessinées, aucun `innerHTML` sur du texte de modèle
+src/core/         no `vscode` import — testable without an editor
+  redaction/      detectors, pseudonym vault, policy
+  providers/      OpenAI-compatible (Ollama, vLLM, LiteLLM, OpenRouter…) + native Anthropic
+  router/         local first, consented escalation, prices, budget
+  completion/     FIM per model family, cache, answer cleanup
+  context/        repository map, symbols, imports
+  session/        the transcript, the prompt derived from it, the modes and the history
+  agent/          the tool loop, and the permission book
+src/shared/       the panel↔extension protocol, and the translation catalogue
+src/extension/    the VS Code layer (sidebar, completion, commands, egress gate)
+src/cli/          the terminal client
+src/webview/      the panel: chat / history / models / permissions screens, hand-drawn SVG icons,
+                  and never `innerHTML` on model output
 ```
 
-Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
-[`docs/PRIVACY.md`](docs/PRIVACY.md) · [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) ·
-décisions : [`docs/adr/`](docs/adr).
+More: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/PRIVACY.md`](docs/PRIVACY.md) ·
+[`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) · decisions: [`docs/adr/`](docs/adr).
+Those documents are currently written in French; translations are welcome.
 
-## Développement
+## Development
 
 ```bash
-npm test               # construit les bundles, puis 120 tests (node:test)
-npm run test:integration   # charge l'extension dans un vrai VS Code (7 tests, headless)
-npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
+npm test                   # builds the bundles, then 128 tests (node:test)
+npm run test:integration   # loads the extension into a real VS Code (7 tests, headless)
 npm run typecheck
-npm run scan:secrets   # scanne ce dépôt avec les détecteurs de l'extension elle-même
-npm run models         # régénère le catalogue de prix depuis OpenRouter
+npm run scan:secrets       # scans this repository with the extension's own detectors
+npm run models             # regenerates the price catalogue from OpenRouter
+npm audit --audit-level=high   # 0 vulnerabilities: 5 dev tools, no runtime dependency
 ```
 
-La CI enchaîne types, tests, tests d'intégration dans un VS Code réel, auto-scan de secrets,
-`npm audit`, CodeQL, empaquetage du `.vsix` et SBOM. Le catalogue de prix est régénéré chaque jour par un job planifié : **aucune version ni aucun
-prix n'est écrit à la main**.
+CI runs types, tests, integration tests in a real VS Code, the secret self-scan, `npm audit`,
+CodeQL, the `.vsix` packaging and an SBOM. The price catalogue is regenerated daily by a scheduled
+job: **no version and no price is ever written by hand**.
 
-## État
+### Translating
 
-`0.1.0` — utilisable au quotidien, pas encore publié sur les places de marché.
-Ce qui est fait et ce qui ne l'est pas : [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The interface is English in the source and translated through one table:
+[`src/shared/i18n.fr.ts`](src/shared/i18n.fr.ts) for the panel, the extension and the CLI, and
+`package.nls.<lang>.json` for the manifest. To add a language, copy those two files, translate the
+values, and register the table in `src/shared/i18n.ts`. A test fails if a string in the source has
+no entry, so a translation cannot silently rot.
+
+## Status
+
+`0.3.0` — usable day to day. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is done and what is
+not.
 
 ## Licence
 
 Apache-2.0.
-
----
-
-### In short (English)
-
-Forge is an open-source coding assistant for VS Code, built for teams that cannot send their
-source code to a third party. It defaults to a model running on your own machine (Ollama, LM Studio,
-vLLM, llama.cpp) and treats a remote provider (OpenRouter, Azure, Anthropic, any OpenAI-compatible
-gateway) as an escalation that must be justified, consented to, and paid for from a budget.
-Everything that does leave is **reversibly pseudonymised** — credentials, identities, hosts, paths
-and your own confidential terms are replaced by stable markers the model can still reason about, and
-restored on your machine.
-
-It ships inline completion, a sidebar chat with an agent mode (approval per action), a terminal
-client, and editor commands. **Zero runtime dependencies, zero telemetry, Apache-2.0.**

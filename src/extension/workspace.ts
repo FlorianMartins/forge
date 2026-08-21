@@ -6,6 +6,7 @@
 // occupies — because an assistant that indexes a monorepo on a laptop is a fan-noise generator.
 
 import * as vscode from "vscode";
+import { t } from "../shared/i18n.js";
 import { buildRepoMap, isMappable, type MapFile } from "../core/context/repomap.js";
 import type { ContextItem } from "../core/session/session.js";
 import { estimateTokens, headToTokens } from "../core/util/tokens.js";
@@ -120,14 +121,14 @@ export class WorkspaceContext {
   async fileContext(uri: vscode.Uri, settings: Settings, maxTokens = 4000): Promise<ContextItem | undefined> {
     const rel = relative(uri);
     if (EgressGate.isBlocked(rel, settings.privacy.blockedGlobs)) {
-      void vscode.window.showWarningMessage(`Forge : ${rel} est exclu par la politique de confidentialité et ne sera pas joint.`);
+      void vscode.window.showWarningMessage(t("Forge: {0} is excluded by the privacy policy and will not be attached.", rel));
       return undefined;
     }
     const doc = await vscode.workspace.openTextDocument(uri);
     const text = doc.getText();
     return {
       kind: "file",
-      label: `${rel}${estimateTokens(text) > maxTokens ? " (tronqué)" : ""}`,
+      label: `${rel}${estimateTokens(text) > maxTokens ? t(" (truncated)") : ""}`,
       body: headToTokens(text, maxTokens),
       untrusted: true,
     };

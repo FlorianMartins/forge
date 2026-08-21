@@ -3,13 +3,14 @@
 // report about privacy that runs code would be a poor joke.
 
 import * as vscode from "vscode";
+import { language, t } from "../shared/i18n.js";
 import { catalogueAge } from "./prices.js";
 import type { EgressGate, EgressRecord } from "./egress.js";
 import type { Settings } from "./config.js";
 
 export function showEgressReport(gate: EgressGate, settings: Settings): void {
   const ledger = gate.ledger();
-  const panel = vscode.window.createWebviewPanel("forge.egress", "Forge — données sortantes", vscode.ViewColumn.Active, {
+  const panel = vscode.window.createWebviewPanel("forge.egress", t("Forge — outgoing data"), vscode.ViewColumn.Active, {
     enableScripts: false,
   });
   const totals = ledger.reduce(
@@ -23,31 +24,35 @@ export function showEgressReport(gate: EgressGate, settings: Settings): void {
   );
 
   panel.webview.html = page(
-    "Données sortantes",
+    t("Outgoing data"),
     `
     <p class="lede">
-      Chaque ligne est une requête partie de cette machine vers un fournisseur distant. Le contenu
-      n'est jamais journalisé — seulement le fait qu'un envoi a eu lieu, sa destination et son
-      coût. Les requêtes vers un serveur local n'apparaissent pas : elles ne sortent pas.
+      ${escapeHtml(
+        t(
+          "Every row is a request that left this machine for a remote provider. The content is never " +
+            "logged — only the fact that a request happened, where it went and what it cost. Requests to a " +
+            "local server do not appear here: they do not leave.",
+        ),
+      )}
     </p>
     <div class="cards">
-      ${card("Envois distants", String(totals.calls))}
-      ${card("Jetons", totals.tokens.toLocaleString("fr-FR"))}
-      ${card("Coût cumulé", `$${totals.usd.toFixed(4)}`)}
-      ${card("Valeurs anonymisées", String(totals.redactions))}
+      ${card(t("Remote requests"), String(totals.calls))}
+      ${card(t("Tokens"), totals.tokens.toLocaleString(uiLocale()))}
+      ${card(t("Total cost"), `$${totals.usd.toFixed(4)}`)}
+      ${card(t("Pseudonymised values"), String(totals.redactions))}
     </div>
     <p class="note">
-      Politique d'anonymisation : <code>${escapeHtml(settings.privacy.redaction)}</code> ·
-      consentement : <code>${escapeHtml(settings.privacy.egressPolicy)}</code> ·
-      journal : <code>${settings.privacy.auditLog ? "activé" : "désactivé"}</code>.
+      ${escapeHtml(t("Redaction policy:"))} <code>${escapeHtml(settings.privacy.redaction)}</code> ·
+      ${escapeHtml(t("consent:"))} <code>${escapeHtml(settings.privacy.egressPolicy)}</code> ·
+      ${escapeHtml(t("log:"))} <code>${escapeHtml(settings.privacy.auditLog ? t("on") : t("off"))}</code>.
     </p>
     ${
       ledger.length
         ? `<table>
-      <thead><tr><th>Quand</th><th>Destination</th><th>Modèle</th><th>Jetons</th><th>Cache</th><th>Coût</th><th>Anonymisé</th></tr></thead>
+      <thead><tr>${[t("When"), t("Destination"), t("Model"), t("Tokens"), t("Cache"), t("Cost"), t("Pseudonymised")].map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
       <tbody>${ledger.map(row).join("")}</tbody>
     </table>`
-        : `<p class="empty">Aucun envoi distant enregistré. Tout s'est passé sur cette machine.</p>`
+        : `<p class="empty">${escapeHtml(t("No remote request recorded. Everything happened on this machine."))}</p>`
     }`,
   );
 }
@@ -67,56 +72,64 @@ export function showCostReport(gate: EgressGate, settings: Settings): void {
   const daily = settings.budget.dailyUsd;
   const pct = daily > 0 ? Math.min(100, Math.round((spent / daily) * 100)) : 0;
 
-  const panel = vscode.window.createWebviewPanel("forge.costs", "Forge — coûts", vscode.ViewColumn.Active, {
+  const panel = vscode.window.createWebviewPanel("forge.costs", t("Forge — cost"), vscode.ViewColumn.Active, {
     enableScripts: false,
   });
   panel.webview.html = page(
-    "Coûts",
+    t("Cost"),
     `
     <div class="cards">
-      ${card("Dépensé aujourd'hui", `$${spent.toFixed(4)}`)}
-      ${card("Plafond quotidien", daily > 0 ? `$${daily.toFixed(2)}` : "aucun")}
-      ${card("Plafond par requête", `$${settings.budget.perRequestUsd.toFixed(2)}`)}
-      ${card("Appels distants", String(gate.budget.callsToday()))}
+      ${card(t("Spent today"), `$${spent.toFixed(4)}`)}
+      ${card(t("Daily cap"), daily > 0 ? `$${daily.toFixed(2)}` : t("none"))}
+      ${card(t("Per-request cap"), `$${settings.budget.perRequestUsd.toFixed(2)}`)}
+      ${card(t("Remote calls"), String(gate.budget.callsToday()))}
     </div>
-    ${daily > 0 ? `<div class="bar"><div class="fill" style="width:${pct}%"></div></div><p class="note">${pct} % du plafond du jour.</p>` : ""}
+    ${daily > 0 ? `<div class="bar"><div class="fill" style="width:${pct}%"></div></div><p class="note">${escapeHtml(t("{0} % of today's cap.", pct))}</p>` : ""}
     <p class="lede">
-      La complétion inline et les tâches auxiliaires tournent en local par construction : elles
-      n'apparaissent jamais ici, quel que soit leur volume. Ce tableau ne compte que ce qui a été
-      délibérément envoyé à un fournisseur payant.
+      ${escapeHtml(
+        t(
+          "Inline completion and the chores run locally by construction: they never appear here, whatever " +
+            "their volume. This table counts only what was deliberately sent to a paid provider.",
+        ),
+      )}
     </p>
     ${
       byModel.size
         ? `<table>
-      <thead><tr><th>Modèle</th><th>Appels</th><th>Jetons</th><th>Servis par le cache</th><th>Coût</th></tr></thead>
+      <thead><tr>${[t("Model"), t("Calls"), t("Tokens"), t("Served from cache"), t("Cost")].map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
       <tbody>${[...byModel.entries()]
         .sort((a, b) => b[1].usd - a[1].usd)
         .map(
           ([model, v]) =>
-            `<tr><td><code>${escapeHtml(model)}</code></td><td>${v.calls}</td><td>${v.tokens.toLocaleString("fr-FR")}</td><td>${
+            `<tr><td><code>${escapeHtml(model)}</code></td><td>${v.calls}</td><td>${v.tokens.toLocaleString(uiLocale())}</td><td>${
               v.tokens ? Math.round((v.cached / v.tokens) * 100) : 0
             } %</td><td>$${v.usd.toFixed(4)}</td></tr>`,
         )
         .join("")}</tbody>
     </table>`
-        : `<p class="empty">Rien dépensé. C'est le comportement par défaut.</p>`
+        : `<p class="empty">${escapeHtml(t("Nothing spent. That is the default behaviour."))}</p>`
     }
-    <p class="note">Catalogue de prix mis à jour ${escapeHtml(catalogueAge())}.</p>`,
+    <p class="note">${escapeHtml(t("Price catalogue updated {0}.", catalogueAge()))}</p>`,
   );
 }
 
 function row(r: EgressRecord): string {
-  const when = new Date(r.at).toLocaleString("fr-FR");
+  const when = new Date(r.at).toLocaleString(uiLocale());
   const cached = r.promptTokens ? Math.round((r.cachedTokens / r.promptTokens) * 100) : 0;
   return `<tr>
     <td>${escapeHtml(when)}</td>
     <td><code>${escapeHtml(r.host)}</code></td>
     <td><code>${escapeHtml(r.model)}</code></td>
-    <td>${(r.promptTokens + r.completionTokens).toLocaleString("fr-FR")}</td>
+    <td>${(r.promptTokens + r.completionTokens).toLocaleString(uiLocale())}</td>
     <td>${cached} %</td>
     <td>$${r.usd.toFixed(4)}</td>
     <td>${r.redactions ? escapeHtml(r.redactionSummary || String(r.redactions)) : "—"}</td>
   </tr>`;
+}
+
+/** Numbers and dates follow the interface language, not the machine's locale. */
+function uiLocale(): string {
+  return language() === "fr" ? "fr-FR" : "en-GB";
 }
 
 function card(label: string, value: string): string {

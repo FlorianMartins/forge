@@ -292,7 +292,7 @@ export async function describeHttpError(res: Response): Promise<string> {
   }
   const hint =
     res.status === 401 || res.status === 403
-      ? " — check the API key (Forge: “Enregistrer une clé de fournisseur”)."
+      ? " — check the API key (Forge: “Store a provider key”)."
       : res.status === 404
         ? " — check the endpoint URL and that the model exists on it."
         : res.status === 429
