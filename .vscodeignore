@@ -8,6 +8,9 @@ scripts/**
 dist-tests/**
 node_modules/**
 docs/screenshots/**
+# Screenshots belong to the README on GitHub, not in the installed package (vsce rewrites the
+# relative links to the repository when publishing).
+docs/images/**
 **/*.map
 tsconfig.json
 esbuild.mjs
