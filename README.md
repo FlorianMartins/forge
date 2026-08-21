@@ -167,6 +167,7 @@ décisions : [`docs/adr/`](docs/adr).
 ```bash
 npm test               # construit les bundles, puis 95 tests (node:test)
 npm run test:integration   # charge l'extension dans un vrai VS Code (7 tests, headless)
+npm audit --audit-level=high   # 0 vulnérabilité : 5 outils de dev, aucune dépendance à l'exécution
 npm run typecheck
 npm run scan:secrets   # scanne ce dépôt avec les détecteurs de l'extension elle-même
 npm run models         # régénère le catalogue de prix depuis OpenRouter

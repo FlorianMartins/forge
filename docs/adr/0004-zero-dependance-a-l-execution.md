@@ -15,6 +15,12 @@ décodage SSE, le glob, le diff, l'estimation de jetons, le rendu Markdown du pa
 de symboles, les détecteurs de secrets. Les seuls paquets présents (`typescript`, `esbuild`,
 `@types/node`, `@types/vscode`) ne servent qu'à construire et ne partent jamais dans le `.vsix`.
 
+Le principe vaut aussi pour l'outillage : les tests d'intégration ont d'abord été écrits sur mocha,
+et `npm audit` a cassé la CI le jour même (`serialize-javascript`, RCE, sévérité haute, tirée par
+mocha). Plutôt que d'abaisser le seuil de l'audit, le lanceur a été réécrit en quarante lignes
+(`src/test/suite/tiny.ts`) et mocha retiré avec ses 114 paquets. **Un garde-fou qu'on désarme la
+première fois qu'il sonne n'en est pas un.**
+
 ## Conséquences
 
 - Le code à auditer est le code de ce dépôt, et rien d'autre. Un SBOM est publié à chaque CI.

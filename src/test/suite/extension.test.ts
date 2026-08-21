@@ -3,6 +3,7 @@
 
 import * as assert from "node:assert/strict";
 import * as vscode from "vscode";
+import { suite, test } from "./tiny.js";
 
 const ID = "hivey.hivey-forge";
 
@@ -83,15 +84,16 @@ suite("Hivey Forge", () => {
 // variable so it never runs in CI. Everything on the resulting image is real UI rendering real
 // content — the only thing faked is the model that answered.
 suite("Screenshot", () => {
-  test("hold the window open with a real conversation", async function () {
-    if (!process.env["FORGE_SCREENSHOT"]) return;
-    this.timeout(180_000);
+  test(
+    "hold the window open with a real conversation",
+    async () => {
+      if (!process.env["FORGE_SCREENSHOT"]) return;
 
-    const config = vscode.workspace.getConfiguration("hiveyForge");
-    await config.update("endpoints.local", process.env["FORGE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
-    await config.update("chat.model", "qwen2.5-coder:7b", vscode.ConfigurationTarget.Global);
+      const config = vscode.workspace.getConfiguration("hiveyForge");
+      await config.update("endpoints.local", process.env["FORGE_SCREENSHOT"], vscode.ConfigurationTarget.Global);
+      await config.update("chat.model", "qwen2.5-coder:7b", vscode.ConfigurationTarget.Global);
 
-    const doc = await vscode.workspace.openTextDocument({
+      const doc = await vscode.workspace.openTextDocument({
       language: "typescript",
       content: [
         "export function totalTTC(lignes: Ligne[], tauxTVA = 0.2): number {",
@@ -100,21 +102,23 @@ suite("Screenshot", () => {
         "}",
         "",
       ].join("\n"),
-    });
-    const editor = await vscode.window.showTextDocument(doc);
-    editor.selection = new vscode.Selection(0, 0, 3, 1);
+      });
+      const editor = await vscode.window.showTextDocument(doc);
+      editor.selection = new vscode.Selection(0, 0, 3, 1);
 
-    // Tidy the window for the capture: no auxiliary chat panel, no notification toast, and a
-    // sidebar wide enough to read — the width a user would actually give it.
-    await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
-    await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
-    await vscode.commands.executeCommand("hiveyForge.chat.focus");
-    for (let i = 0; i < 10; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
-    await vscode.commands.executeCommand("hiveyForge.askWith", "Cette fonction arrondit-elle correctement ? Que corriger ?");
-    await new Promise((r) => setTimeout(r, 4000));
-    await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
+      // Tidy the window for the capture: no auxiliary chat panel, no notification toast, and a
+      // sidebar wide enough to read — the width a user would actually give it.
+      await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar").then(undefined, () => {});
+      await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
+      await vscode.commands.executeCommand("hiveyForge.chat.focus");
+      for (let i = 0; i < 10; i++) await vscode.commands.executeCommand("workbench.action.increaseViewSize");
+      await vscode.commands.executeCommand("hiveyForge.askWith", "Cette fonction arrondit-elle correctement ? Que corriger ?");
+      await new Promise((r) => setTimeout(r, 4000));
+      await vscode.commands.executeCommand("notifications.clearAll").then(undefined, () => {});
 
-    // Long enough for the turn to stream and render, then for the capture to happen.
-    await new Promise((r) => setTimeout(r, Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 45_000)));
-  });
+      // Long enough for the turn to stream and render, then for the capture to happen.
+      await new Promise((r) => setTimeout(r, Number(process.env["FORGE_SCREENSHOT_HOLD"] ?? 45_000)));
+    },
+    200_000,
+  );
 });

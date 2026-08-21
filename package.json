@@ -390,12 +390,10 @@
     "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.90.0",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
-    "mocha": "^10.8.2",
     "typescript": "^5.9.0"
   },
   "bin": {
