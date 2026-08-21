@@ -55,7 +55,12 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
   }
   wrap.append(temp);
 
-  wrap.append(sectionTitle("Ajouter une règle", "Pour les actions que vous ne voulez plus voir demandées — ou plus jamais voir."));
+  wrap.append(
+    sectionTitle(
+      "Ajouter une règle permanente",
+      "« Autoriser » cesse de demander pour cette action ; « Refuser » la bloque sans la proposer.",
+    ),
+  );
   const add = el("div", "perm-add");
   for (const tool of GRANTABLE) {
     const row = el("div", "perm-add-row");
@@ -63,13 +68,13 @@ export function permissionsScreen(state: UiState, send: (m: ToExtension) => void
     row.append(el("div", "spacer"));
     row.append(
       button({
-        label: "Toujours autoriser",
+        label: "Autoriser",
         className: "btn tiny",
         title: "Cette action ne sera plus demandée, dans tous les espaces de travail",
         onClick: () => send({ type: "setPermission", tool, level: "always" }),
       }),
       button({
-        label: "Toujours refuser",
+        label: "Refuser",
         className: "btn tiny danger",
         title: "Cette action sera refusée sans être proposée",
         onClick: () => send({ type: "setPermission", tool, level: "never" }),
