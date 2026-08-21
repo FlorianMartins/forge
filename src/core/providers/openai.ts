@@ -7,6 +7,7 @@
 //   • Ollama exposes fill-in-the-middle through its native `/api/generate` with a `suffix`, and
 //     that path is much better than hand-writing FIM tokens into a chat prompt.
 
+import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type {
   ChatDelta,
@@ -38,12 +39,35 @@ export class OpenAICompatibleProvider implements Provider {
   readonly baseUrl: string;
   readonly isLocal: boolean;
   private readonly opts: OpenAIProviderOptions;
+  private ollamaProbe: boolean | undefined;
 
   constructor(opts: OpenAIProviderOptions) {
     this.opts = opts;
     this.id = opts.id;
     this.baseUrl = trimSlash(opts.baseUrl);
     this.isLocal = opts.isLocal;
+  }
+
+  /**
+   * Is this endpoint an Ollama server? The port is the usual clue, but plenty of teams run it
+   * behind a reverse proxy on 443 or on a custom port, and getting this wrong costs the good
+   * fill-in-the-middle path. So: sniff the URL first, then probe once and remember.
+   *
+   * The probe only ever runs against an endpoint already classified as local. A remote provider
+   * must never receive a request the user did not ask for, even an empty one.
+   */
+  private async isOllamaServer(): Promise<boolean> {
+    if (this.ollamaProbe !== undefined) return this.ollamaProbe;
+    if (isOllama(this.baseUrl)) return (this.ollamaProbe = true);
+    if (!this.isLocal) return (this.ollamaProbe = false);
+    try {
+      const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
+      const res = await request(`${root}/api/version`, { timeoutMs: 2500, label: "server probe" });
+      this.ollamaProbe = res.ok;
+    } catch {
+      this.ollamaProbe = false;
+    }
+    return this.ollamaProbe;
   }
 
   private headers(): Record<string, string> {
@@ -85,11 +109,13 @@ export class OpenAICompatibleProvider implements Provider {
     body["stream_options"] = { include_usage: true };
     if (this.id === "openrouter") body["usage"] = { include: true };
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+    const res = await request(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
       signal: req.signal,
+      timeoutMs: this.opts.timeoutMs ?? 180_000,
+      label: "chat",
     });
     if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
 
@@ -151,11 +177,13 @@ export class OpenAICompatibleProvider implements Provider {
    * templated prompt the caller built.
    */
   async complete(req: CompletionRequest): Promise<string> {
-    if (isOllama(this.baseUrl)) {
+    if (await this.isOllamaServer()) {
       const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
-      const res = await fetch(`${root}/api/generate`, {
+      const res = await request(`${root}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        timeoutMs: 45_000,
+        label: "completion",
         body: JSON.stringify({
           model: req.model,
           prompt: req.prefix,
@@ -163,6 +191,8 @@ export class OpenAICompatibleProvider implements Provider {
           stream: false,
           raw: false,
           options: { num_predict: req.maxTokens, temperature: 0.1, stop: req.stop },
+          // Keep the weights resident: the cost of a cold start is paid on the next keystroke.
+          keep_alive: "30m",
         }),
         signal: req.signal,
       });
@@ -171,9 +201,11 @@ export class OpenAICompatibleProvider implements Provider {
       return json.response ?? "";
     }
 
-    const res = await fetch(`${this.baseUrl}/completions`, {
+    const res = await request(`${this.baseUrl}/completions`, {
       method: "POST",
       headers: this.headers(),
+      timeoutMs: 45_000,
+      label: "completion",
       body: JSON.stringify({
         model: req.model,
         prompt: req.prefix,
@@ -190,9 +222,30 @@ export class OpenAICompatibleProvider implements Provider {
     return json.choices?.[0]?.text ?? "";
   }
 
+  /**
+   * Load the model without generating anything. Ollama unloads weights after a few minutes of
+   * inactivity, and the first request after that pays the whole load time — which is the one
+   * request the user is watching. Called on activation and after a long idle.
+   */
+  async warmup(model: string): Promise<void> {
+    if (!(await this.isOllamaServer())) return;
+    const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
+    try {
+      await request(`${root}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, prompt: "", keep_alive: "30m" }),
+        timeoutMs: 120_000,
+        label: "warm-up",
+      });
+    } catch {
+      // A warm-up that fails is not an error the user needs: the next real request will report it.
+    }
+  }
+
   async listModels(): Promise<string[]> {
     try {
-      const res = await fetch(`${this.baseUrl}/models`, { headers: this.headers() });
+      const res = await request(`${this.baseUrl}/models`, { headers: this.headers(), timeoutMs: 15_000, label: "model list" });
       if (res.ok) {
         const json = (await res.json()) as any;
         const ids = (json.data ?? []).map((m: any) => m.id).filter(Boolean);
@@ -202,9 +255,9 @@ export class OpenAICompatibleProvider implements Provider {
       /* fall through to the native listing */
     }
     // Older or proxied Ollama builds do not serve /v1/models.
-    if (isOllama(this.baseUrl)) {
+    if (await this.isOllamaServer()) {
       const root = trimSlash(this.baseUrl).replace(/\/v1$/, "");
-      const res = await fetch(`${root}/api/tags`);
+      const res = await request(`${root}/api/tags`, { timeoutMs: 15_000, label: "model list" });
       if (!res.ok) throw new Error(await describeHttpError(res));
       const json = (await res.json()) as any;
       return (json.models ?? []).map((m: any) => m.name).filter(Boolean);

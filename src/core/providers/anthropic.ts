@@ -5,6 +5,7 @@
 // the single biggest lever on a coding assistant's bill, because a coding conversation resends
 // almost the same context on every turn.
 
+import { request } from "../util/http.js";
 import { sseData, sseLines } from "../util/sse.js";
 import type { ChatDelta, ChatRequest, ChatResult, Provider, ToolCall, Usage } from "./types.js";
 import { EMPTY_USAGE } from "./types.js";
@@ -66,7 +67,7 @@ export class AnthropicProvider implements Provider {
       body["tools"] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
     }
 
-    const res = await fetch(`${this.baseUrl}/messages`, {
+    const res = await request(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -75,6 +76,8 @@ export class AnthropicProvider implements Provider {
       },
       body: JSON.stringify(body),
       signal: req.signal,
+      timeoutMs: 180_000,
+      label: "chat",
     });
     if (!res.ok || !res.body) throw new Error(await describeHttpError(res));
 
@@ -136,8 +139,10 @@ export class AnthropicProvider implements Provider {
   }
 
   async listModels(): Promise<string[]> {
-    const res = await fetch(`${this.baseUrl}/models`, {
+    const res = await request(`${this.baseUrl}/models`, {
       headers: { "x-api-key": this.opts.apiKey.trim(), "anthropic-version": this.opts.version ?? "2023-06-01" },
+      timeoutMs: 15_000,
+      label: "model list",
     });
     if (!res.ok) throw new Error(await describeHttpError(res));
     const json = (await res.json()) as any;
