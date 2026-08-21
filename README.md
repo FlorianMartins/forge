@@ -131,6 +131,34 @@ forge "pourquoi ce test est instable ?"   # question unique
 Configuration par `.hivey-forge.json` (dossier courant, puis `~`) — un projet peut donc committer
 sa configuration d'équipe sans committer de clé (`apiKeyEnv` nomme la variable d'environnement).
 
+Une session, dans les grandes lignes (l'échange est un exemple, la mise en forme est celle du
+client) :
+
+```
+Hivey Forge — assistant de code souverain
+qwen2.5-coder:7b via 127.0.0.1:11434 · local (coût nul)
+/aide pour les commandes, Ctrl+C pour quitter.
+
+› cette fonction arrondit-elle correctement ?
+  lu src/facturation/total.ts
+La fonction ne comporte aucun arrondi : le résultat est un flottant, et sur une facture
+cela produit des écarts d'un centime que la comptabilité refuse.
+[…]
+? modifier src/facturation/total.ts — autoriser ? [o/N] o
+
+  src/facturation/total.ts
+  - return ht * (1 + tauxTVA);
+  + return Math.round(htCentimes * (1 + tauxTVA)) / 100;
+
+? exécuter `npm test` — autoriser ? [o/N] o
+  $ npm test
+```
+
+Les commandes du REPL : `/contexte` liste les échanges, `/muet 3` en retire un du contexte sans
+l'effacer, `/oublier 3` le supprime, `/agent` bascule outils actifs / discussion seule, `/cout`
+donne la dépense du jour. Depuis l'éditeur, `Hivey Forge : Ouvrir Forge dans le terminal` le lance
+avec la même configuration que la barre latérale.
+
 ## Déploiement en entreprise
 
 - Servez un modèle une fois pour tous : **vLLM** ou **Ollama** derrière une URL interne, et poussez
