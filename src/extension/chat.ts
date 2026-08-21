@@ -380,10 +380,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         approve: (req) => this.askApproval(req),
         // Redaction runs on EVERY step, because a tool result is new text that never went through
         // the gate — a file the agent just read can contain the credential the first prompt did not.
+        //
+        // A refusal here must ABORT the turn. Falling back to the original messages would send the
+        // unredacted text precisely when the user said no, which is the worst possible failure of
+        // this design: the safe path and the error path must not diverge.
         beforeRequest: async (messages) => {
           if (isLocal) return messages;
           const again = await this.gate.prepare(messages, settings, { provider: providerId, model, baseUrl, isLocal }, vault);
-          return again?.messages ?? messages;
+          if (!again) throw new Error("Envoi refusé : la suite du tour n'a pas été transmise.");
+          return again.messages;
         },
         afterResponse: (t) => vault.restore(t),
       });

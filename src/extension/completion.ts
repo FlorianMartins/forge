@@ -9,10 +9,11 @@
 
 import * as vscode from "vscode";
 import { complete, type CompletionContext as CoreCtx } from "../core/completion/engine.js";
+import { redact, Vault } from "../core/redaction/index.js";
 import { CompletionCache } from "../core/completion/cache.js";
 import { isOllama, type Provider } from "../core/providers/index.js";
 import { EgressGate } from "./egress.js";
-import { providerFor, readSettings, type Settings } from "./config.js";
+import { providerFor, readSettings, redactionPolicy, type Settings } from "./config.js";
 import type { Keys } from "./config.js";
 import { relative } from "./workspace.js";
 
@@ -40,6 +41,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     token: vscode.CancellationToken,
   ): Promise<vscode.InlineCompletionItem[] | undefined> {
     const settings = readSettings(document.uri);
+    const policy = redactionPolicy(settings);
     if (!settings.completion.enabled || settings.completion.provider === "off") return undefined;
     if (document.uri.scheme === "output" || document.uri.scheme === "vscode-scm") return undefined;
 
@@ -74,10 +76,25 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     try {
       const provider = await this.resolveProvider(settings);
       const t0 = Date.now();
+
+      // A remote completion sends the code around the cursor, which is exactly the material the
+      // privacy policy is about. It goes through the same redaction as everything else, and the
+      // placeholders are resolved again before the suggestion reaches the editor — so the user
+      // sees their own identifiers, and the provider never did.
+      const vault = new Vault();
+      const sent: CoreCtx = provider.isLocal
+        ? ctx
+        : {
+            ...ctx,
+            prefix: redact(ctx.prefix, vault, policy).text,
+            suffix: redact(ctx.suffix, vault, policy).text,
+            related: ctx.related?.map((r) => ({ path: r.path, body: redact(r.body, vault, policy).text })),
+          };
+
       const outcome = await complete(
         provider,
         this.cache,
-        ctx,
+        sent,
         {
           model: settings.completion.model,
           maxTokens: settings.completion.maxTokens,
@@ -90,6 +107,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         ctl.signal,
       );
       if (token.isCancellationRequested || !outcome.completion) return undefined;
+      const suggestion = provider.isLocal ? outcome.completion : vault.restore(outcome.completion);
 
       if (outcome.source === "model") {
         this.requested++;
@@ -99,7 +117,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
 
       return [
         new vscode.InlineCompletionItem(
-          outcome.completion,
+          suggestion,
           new vscode.Range(position, position),
           // Counting acceptances is the only telemetry here, it stays on this machine, and it is
           // what tells a team whether a small local model is good enough for them.

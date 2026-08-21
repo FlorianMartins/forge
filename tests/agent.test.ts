@@ -173,6 +173,25 @@ test("redaction happens on the way out and is undone on the way in", async () =>
   assert.equal(r.text, "the address alice@corp.fr is invalid", "the user reads their own data");
 });
 
+test("a refusal in beforeRequest stops the turn instead of sending the original messages", async () => {
+  // The rule this pins: when the gate says no — a secret the user would not release, a consent
+  // dialog they closed — the safe path and the error path must not diverge. Falling back to the
+  // unredacted messages would send the data precisely when the answer was "do not send it".
+  const provider = scriptedProvider([{ text: "should never be reached" }]);
+  await assert.rejects(
+    () =>
+      runTurn({
+        ...base,
+        provider,
+        beforeRequest: () => {
+          throw new Error("Envoi refusé");
+        },
+      }),
+    /refusé/,
+  );
+  assert.equal(provider.seen.length, 0, "nothing was sent");
+});
+
 test("cancelling stops the turn between steps", async () => {
   const ctl = new AbortController();
   const t = tool("a", {
