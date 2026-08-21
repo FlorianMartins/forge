@@ -97,6 +97,23 @@
         "command": "hiveyForge.indexWorkspace",
         "title": "Réindexer l'espace de travail",
         "category": "Hivey Forge"
+      },
+      {
+        "command": "hiveyForge.editSelection",
+        "title": "Modifier la sélection avec l'IA",
+        "category": "Hivey Forge",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyForge.generateCommitMessage",
+        "title": "Rédiger le message de commit",
+        "category": "Hivey Forge",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "hiveyForge.explainTerminalSelection",
+        "title": "Expliquer la sortie du terminal",
+        "category": "Hivey Forge"
       }
     ],
     "menus": {
@@ -112,15 +129,39 @@
           "command": "hiveyForge.askAboutSelection",
           "when": "editorHasSelection",
           "group": "hivey@1"
+        },
+        {
+          "command": "hiveyForge.editSelection",
+          "when": "editorTextFocus",
+          "group": "hivey@2"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "hiveyForge.generateCommitMessage",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "hiveyForge.explainTerminalSelection",
+          "group": "hivey@1"
         }
       ]
     },
     "keybindings": [
       {
+        "command": "hiveyForge.editSelection",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus"
+      },
+      {
         "command": "hiveyForge.askAboutSelection",
         "key": "ctrl+alt+i",
         "mac": "cmd+alt+i",
-        "when": "editorHasSelection"
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
@@ -265,6 +306,39 @@
           "type": "boolean",
           "default": true,
           "description": "Joindre une carte des symboles du dépôt plutôt que des fichiers entiers."
+        },
+        "hiveyForge.privacy.customTerms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Mots propres à l'organisation à toujours remplacer avant un envoi distant : noms de clients, de projets, de marques internes."
+        },
+        "hiveyForge.escalation.policy": {
+          "type": "string",
+          "enum": [
+            "never",
+            "ask",
+            "auto"
+          ],
+          "default": "ask",
+          "markdownDescription": "Quand le modèle local ne suffit pas (contexte trop grand, question de diagnostic ou d'architecture) : `never` refuse, `ask` propose, `auto` bascule seul vers le modèle d'escalade."
+        },
+        "hiveyForge.escalation.provider": {
+          "type": "string",
+          "enum": [
+            "openrouter",
+            "openai-compatible",
+            "anthropic"
+          ],
+          "default": "openrouter",
+          "description": "Fournisseur utilisé lors d'une escalade."
+        },
+        "hiveyForge.escalation.model": {
+          "type": "string",
+          "default": "",
+          "description": "Modèle d'escalade (vide = pas d'escalade possible)."
         }
       }
     }
@@ -273,7 +347,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node esbuild.mjs --tests && node --test dist-tests/",
+    "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
     "package": "npx --yes @vscode/vsce@2 package --no-dependencies -o hivey-forge.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check"
@@ -283,5 +357,8 @@
     "@types/vscode": "^1.90.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0"
+  },
+  "bin": {
+    "forge": "./dist/forge.js"
   }
 }

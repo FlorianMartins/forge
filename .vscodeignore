@@ -1,0 +1,16 @@
+# What is NOT shipped in the .vsix. The published extension is the bundle, the panel assets and
+# the documents a reviewer needs — nothing that would let source drift from what runs.
+.github/**
+.vscode/**
+src/**
+tests/**
+scripts/**
+dist-tests/**
+node_modules/**
+docs/screenshots/**
+*.map
+tsconfig.json
+esbuild.mjs
+.gitignore
+.gitleaks.toml
+**/*.ts

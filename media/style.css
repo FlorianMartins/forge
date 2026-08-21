@@ -1,0 +1,238 @@
+/* The panel's look. Everything is expressed in the editor's own theme variables, so the extension
+   inherits whatever theme the user chose instead of imposing a palette that clashes with it. The
+   single accent — amber — is the one thing that belongs to Hivey rather than to VS Code, and it is
+   used only where attention should go: the send button, the pinned state, the local/remote badge. */
+
+:root {
+  --forge-accent: #d7a13b;
+  --forge-accent-dim: rgba(215, 161, 59, 0.16);
+  --forge-radius: 6px;
+  --forge-gap: 0.6rem;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background);
+}
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Header ─────────────────────────────────────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--forge-gap);
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  flex: 0 0 auto;
+}
+.bar-left, .bar-right { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+
+.badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.badge.local { color: var(--forge-accent); border-color: var(--forge-accent); background: var(--forge-accent-dim); }
+.badge.remote { color: var(--vscode-charts-blue, #4aa3df); border-color: currentColor; }
+
+.tokens { font-size: 0.72rem; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────────────────────── */
+
+button {
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--forge-radius);
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+}
+button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.18)); }
+button:focus-visible { outline: 1px solid var(--forge-accent); outline-offset: 1px; }
+
+button.model {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+button.cost { color: var(--vscode-descriptionForeground); font-variant-numeric: tabular-nums; }
+
+button.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  padding: 0.25rem 0.8rem;
+}
+button.primary:hover { background: var(--vscode-button-hoverBackground); }
+button.text { color: var(--vscode-descriptionForeground); }
+
+/* ── History ────────────────────────────────────────────────────────────────────────────── */
+
+.history { flex: 1 1 auto; overflow-y: auto; padding: 0.4rem; }
+.history-row { display: flex; align-items: center; gap: 0.25rem; }
+.history-row.current { background: var(--forge-accent-dim); border-radius: var(--forge-radius); }
+.history-open {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+}
+.history-title { font-size: 0.85rem; }
+.history-date { font-size: 0.7rem; color: var(--vscode-descriptionForeground); }
+
+/* ── Transcript ─────────────────────────────────────────────────────────────────────────── */
+
+.transcript { flex: 1 1 auto; overflow-y: auto; padding: 0.5rem 0.6rem 1rem; }
+
+.welcome { color: var(--vscode-descriptionForeground); padding: 1rem 0.4rem; line-height: 1.5; }
+.welcome h2 { color: var(--vscode-foreground); font-size: 1rem; margin: 0 0 0.5rem; }
+.welcome .tips { padding-left: 1rem; margin: 0.8rem 0 0; }
+.welcome .tips li { margin-bottom: 0.35rem; font-size: 0.85rem; }
+
+.entry { padding: 0.5rem 0 0.7rem; border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15)); }
+.entry.user .body { color: var(--vscode-foreground); }
+/* A muted exchange stays legible — it is still part of the story — but visibly out of play. */
+.entry.muted { opacity: 0.45; }
+.entry.muted .body { text-decoration-line: none; border-left: 2px solid var(--vscode-descriptionForeground); padding-left: 0.5rem; }
+.entry.failed .body { color: var(--vscode-errorForeground); }
+
+.entry-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem; }
+.who { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vscode-descriptionForeground); }
+.entry.assistant .who { color: var(--forge-accent); }
+.meta { font-size: 0.68rem; color: var(--vscode-descriptionForeground); }
+.meta.warn { color: var(--forge-accent); }
+.meta.pulse { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+
+.entry-actions { margin-left: auto; display: flex; gap: 0.1rem; opacity: 0; transition: opacity 120ms; }
+.entry:hover .entry-actions, .entry-actions:focus-within { opacity: 1; }
+
+.body { line-height: 1.55; font-size: 0.88rem; overflow-wrap: anywhere; }
+.body p.md { margin: 0 0 0.6rem; white-space: pre-wrap; }
+.body .md-h { font-size: 0.9rem; margin: 0.8rem 0 0.35rem; }
+.body .md-list { margin: 0 0 0.6rem; padding-left: 1.1rem; }
+.body .md-list li { margin-bottom: 0.2rem; }
+code.md-code, .code code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+}
+code.md-code { background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15)); padding: 0.05rem 0.25rem; border-radius: 3px; }
+
+.code-block {
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  border-radius: var(--forge-radius);
+  margin: 0.5rem 0 0.7rem;
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.15rem 0.35rem;
+  background: var(--vscode-editorWidget-background);
+}
+.code-head .lang { font-size: 0.68rem; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
+.code-tools { display: flex; gap: 0.15rem; }
+pre.code {
+  margin: 0;
+  padding: 0.5rem;
+  overflow-x: auto;
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
+}
+
+.status {
+  font-size: 0.75rem;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  padding: 0.1rem 0;
+}
+.status::before { content: "› "; color: var(--forge-accent); }
+
+.error {
+  color: var(--vscode-errorForeground);
+  font-size: 0.82rem;
+  border-left: 2px solid var(--vscode-errorForeground);
+  padding: 0.2rem 0 0.2rem 0.5rem;
+  margin: 0.3rem 0;
+}
+
+.live-text { white-space: pre-wrap; }
+
+/* ── Approval ───────────────────────────────────────────────────────────────────────────── */
+
+.approval {
+  border: 1px solid var(--forge-accent);
+  background: var(--forge-accent-dim);
+  border-radius: var(--forge-radius);
+  padding: 0.5rem 0.6rem;
+  margin: 0.5rem 0;
+}
+.approval-head { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--forge-accent); }
+.approval-body { font-size: 0.88rem; margin: 0.25rem 0; font-family: var(--vscode-editor-font-family); overflow-wrap: anywhere; }
+.approval-tool { font-size: 0.7rem; color: var(--vscode-descriptionForeground); }
+.approval-actions { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+.approval-done { font-size: 0.8rem; color: var(--vscode-descriptionForeground); }
+
+/* ── Composer ───────────────────────────────────────────────────────────────────────────── */
+
+.composer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+  padding: 0.45rem 0.6rem 0.6rem;
+  background: var(--vscode-sideBar-background);
+}
+.composer textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.87rem;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: var(--forge-radius);
+  padding: 0.45rem 0.55rem;
+}
+.composer textarea:focus { outline: 1px solid var(--forge-accent); border-color: transparent; }
+
+.composer-row { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.4rem; }
+.composer-row .spacer { flex: 1 1 auto; }
+.toggle { display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--vscode-descriptionForeground); cursor: pointer; }
+.toggle input { accent-color: var(--forge-accent); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.2rem 0 0.35rem; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-badge-background);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-x { padding: 0 0.1rem; font-size: 0.7rem; line-height: 1; }
+
+.empty { color: var(--vscode-descriptionForeground); font-style: italic; padding: 0.5rem; }

@@ -1,5 +1,6 @@
 // Build script. Three outputs, one bundler, no plugin:
 //   dist/extension.js   — the extension host (CommonJS, `vscode` left external)
+//   dist/forge.js       — the terminal client, sharing the same core
 //   media/webview.js    — the discussion panel (IIFE, runs in the webview sandbox)
 //   dist-tests/*.js     — the test files, so `node --test` can run TypeScript sources
 //
@@ -41,6 +42,14 @@ const targets = tests
         platform: "node",
         format: "cjs",
         external: ["vscode"],
+      },
+      {
+        ...common,
+        entryPoints: ["src/cli/main.ts"],
+        outfile: "dist/forge.js",
+        platform: "node",
+        format: "cjs",
+        // No shebang banner here: the entry file already carries one, and two would be a syntax error.
       },
       {
         ...common,

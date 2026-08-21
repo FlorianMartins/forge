@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- A hexagon (the hive) whose lower half is a closed cell: what is inside stays inside. -->
+  <path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z"/>
+  <path d="M12 7.4 16.6 10v4.6L12 17.2 7.4 14.6V10z" opacity="0.55"/>
+  <path d="M12 12.3v4.9"/>
+</svg>
