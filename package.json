@@ -387,7 +387,7 @@
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
     "scan:secrets": "node scripts/scan-secrets.mjs",
-    "test:integration": "node esbuild.mjs --integration && node dist-integration/runTest.js"
+    "test:integration": "node esbuild.mjs && node esbuild.mjs --integration && node dist-integration/runTest.js"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
