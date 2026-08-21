@@ -432,7 +432,7 @@
     "publish:ovsx": "npx --yes ovsx publish forge.vsix"
   },
   "devDependencies": {
-    "@types/node": "^18.19.0",
+    "@types/node": "^26.2.0",
     "@types/vscode": "^1.90.0",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
