@@ -44,6 +44,31 @@ test("a variable is not a secret", () => {
   assert.ok(r.text.includes("os.environ"));
 });
 
+test("an assignment whose value is code, a type or a label is not a secret", () => {
+  // Every line below was a false positive found by running this detector over its own repository.
+  const code = [
+    "const apiKey = cfg.apiKey;",
+    "apiKey?: string;",
+    'password = os.environ["PW"]',
+    "secret: \"SECRET\",",
+    "token: vscode.CancellationToken,",
+    "auth = ANOTHER_CONSTANT",
+    'apiKey: "${API_KEY}"',
+    'password = "change-me"',
+  ].join("\n");
+  const r = redact(code, new Vault(), strict);
+  assert.equal(r.hasSecret, false, `false positives: ${r.findings.map((f) => f.value).join(", ")}`);
+
+  // …while a quoted literal that looks like a credential still is one.
+  assert.equal(redact('password = "hT7-x92Kd0qLm4"', new Vault(), strict).hasSecret, true);
+  assert.equal(redact("API_TOKEN=9f8d7a6b5c4e3f2a1b0c9d8e", new Vault(), strict).hasSecret, true);
+});
+
+test("a checksum is public by construction and is left alone", () => {
+  const lock = '"integrity": "sha512-Xh3TgQXCLB8dLNK5cSXAsFVR2K0IXQ9v8ZzY2Vx1nMqLpJ7kR4tSbWc="';
+  assert.equal(redact(lock, new Vault(), strict).hasSecret, false);
+});
+
 test("the same value always gets the same placeholder, a different value a different one", () => {
   const v = new Vault();
   const r = redact("write to alice@corp.fr and cc alice@corp.fr, not bob@corp.fr", v, strict);

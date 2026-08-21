@@ -19,7 +19,15 @@ export interface RawSpan {
   value: string;
 }
 
-type Rule = { name: string; kind: FindingKind; re: RegExp; group?: number; verify?: (m: string) => boolean };
+type Rule = {
+  name: string;
+  kind: FindingKind;
+  re: RegExp;
+  group?: number;
+  /** Chooses the captured value when a rule has alternative groups. */
+  pick?: (m: RegExpExecArray) => string | undefined;
+  verify?: (value: string, quoted: boolean) => boolean;
+};
 
 /** Shannon entropy in bits per character — the classic "does this look random?" measure. */
 export function entropy(s: string): number {
@@ -57,14 +65,33 @@ const RULES: Rule[] = [
   // Credentials carried inside a URL: `postgres://user:p4ssw0rd@db.internal:5432/app`.
   { name: "url-credentials", kind: "secret", re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:([^\s/@]{3,})@/gi, group: 1 },
   // `PASSWORD = "…"`, `api_key: '…'`, `SECRET=…` — the assignment is what makes it a secret.
+  //
+  // The hard part is not finding these; it is not finding them in ordinary code. `apiKey: cfg.apiKey`,
+  // `apiKey?: string`, `password = os.environ["PW"]` are all assignments to a secret-shaped name
+  // whose value is a reference, a type or a lookup — never a credential. Running this scanner over
+  // this very repository is what surfaced them, so the rule splits the two cases: a QUOTED value is
+  // a literal and is treated as a secret; an UNQUOTED one has to look like a credential rather than
+  // like an expression.
   {
     name: "assigned-secret",
     kind: "secret",
-    re: /\b(?:api[_-]?key|apikey|secret|token|password|passwd|pwd|private[_-]?key|access[_-]?key|client[_-]?secret|auth)\b\s*[:=]\s*["'`]?([^\s"'`,;)]{6,})["'`]?/gi,
-    group: 1,
-    // `password = os.environ["PW"]` is code, not a credential. Anything with a variable shape is
-    // left alone; a literal is not.
-    verify: (v) => !/^(?:process\.|os\.|env[.[]|null|true|false|undefined|none|\$\{|<|\{\{|@|"|')/i.test(v) && !/^[A-Z_]{2,}$/.test(v),
+    re: /\b(?:api[_-]?key|apikey|secret|token|password|passwd|pwd|private[_-]?key|access[_-]?key|client[_-]?secret|auth)\b\s*[?!]?\s*[:=]\s*(?:(["'`])([^"'`\n]{6,})\1|([^\s"'`,;)}\]]{6,}))/gi,
+    // Either the quoted body or the bare token, whichever matched.
+    pick: (m) => m[2] ?? m[3],
+    verify: (v, quoted) => {
+      // Placeholders and interpolations are not credentials, quoted or not.
+      if (/^(?:\$\{|<|\{\{|%[a-z_]+%|xxx+|\*{3,}|change[_-]?me|your[_-]|todo|placeholder|example)/i.test(v)) return false;
+      // A word in block capitals is a label, an enum member or a constant name — `secret: "SECRET"`
+      // is a table of category names, and this scanner found one in its own source.
+      if (/^[A-Z][A-Z_]*$/.test(v)) return false;
+      if (quoted) return !/^(?:process\.|os\.|env[.[])/i.test(v);
+      // Unquoted: reject anything with the shape of an expression, a type or a constant name.
+      if (/[.(\[<]|::|->/.test(v)) return false;
+      if (/^(?:string|number|boolean|any|unknown|null|true|false|undefined|none|nil|str|int)$/i.test(v)) return false;
+      if (/^[A-Z_][A-Z0-9_]*$/.test(v)) return false; // SECRET = ANOTHER_CONSTANT
+      // What is left must actually look random: a real value in a .env file does.
+      return entropy(v) > 2.6 || v.length >= 16;
+    },
   },
 
   // ── People ─────────────────────────────────────────────────────────────────────────────────
@@ -98,11 +125,11 @@ export function scanShapes(text: string): RawSpan[] {
     let m: RegExpExecArray | null;
     while ((m = re.exec(text))) {
       if (m[0] === "") { re.lastIndex++; continue; }
-      const gi = rule.group ?? 0;
-      const value = m[gi];
+      const value = rule.pick ? rule.pick(m) : m[rule.group ?? 0];
       if (value == null || value === "") continue;
-      if (rule.verify && !rule.verify(value)) continue;
-      const start = gi === 0 ? m.index : m.index + m[0].indexOf(value);
+      const quoted = rule.pick ? m[0].includes(`"${value}`) || m[0].includes(`'${value}`) || m[0].includes(`\`${value}`) : false;
+      if (rule.verify && !rule.verify(value, quoted)) continue;
+      const start = m[0] === value ? m.index : m.index + m[0].indexOf(value);
       out.push({ kind: rule.kind, rule: rule.name, start, end: start + value.length, value });
     }
   }
@@ -116,6 +143,10 @@ export function scanEntropy(text: string): RawSpan[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const v = m[0];
+    // A checksum is public by construction: `sha512-…` in a lock file, a git object id, a
+    // subresource-integrity attribute. Redacting them adds noise and hides nothing.
+    if (/(?:sha1|sha256|sha384|sha512|md5)-$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
+    if (/integrity["'\s:=]+$/i.test(text.slice(Math.max(0, m.index - 14), m.index))) continue;
     if (v.length < HIGH_ENTROPY_MIN_LEN) continue;
     // A long identifier is words joined by _ or -, and reads with low entropy; a key does not.
     if (entropy(v) < HIGH_ENTROPY_MIN_BITS) continue;

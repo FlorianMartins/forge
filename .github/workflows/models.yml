@@ -1,0 +1,35 @@
+name: Model catalogue
+
+# Keeps prices and model ids current without anyone editing them by hand. The rule this enforces:
+# no version and no price is ever hard-coded in the source — the file it writes is generated, and
+# the workflow commits the diff when a provider changes something.
+
+on:
+  schedule:
+    - cron: "31 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/update-models.mjs
+      - name: Commit when something moved
+        run: |
+          FILE=src/core/router/catalog.generated.ts
+          if [[ -n "$(git status --porcelain $FILE)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add $FILE
+            git commit -m "chore(models): refresh the price catalogue"
+            git push
+          else
+            echo "No change today."
+          fi

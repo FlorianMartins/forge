@@ -1,0 +1,66 @@
+name: CI
+
+# The gate every change crosses. Ordered cheapest-first so a typo fails in seconds rather than
+# after a five-minute build, and split into named steps so a red run says WHAT broke without
+# anyone opening the log.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Secrets — scanned with the extension's own detectors
+        run: node scripts/scan-secrets.mjs
+
+      - name: Dependencies — known vulnerabilities
+        # The extension ships zero runtime dependency; this covers the dev toolchain, which is
+        # still code that runs on a maintainer's machine.
+        run: npm audit --audit-level=high
+
+      - name: Model catalogue is in sync
+        run: npm run models:check
+        continue-on-error: true # a provider outage must not turn the build red
+
+      - name: Package the extension
+        run: npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-forge.vsix
+
+      - name: Software bill of materials
+        run: |
+          npx --yes @cyclonedx/cyclonedx-npm@latest --output-file sbom.json --omit dev || \
+            echo '{"note":"SBOM generation skipped"}' > sbom.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hivey-forge-vsix
+          path: |
+            hivey-forge.vsix
+            sbom.json
+          retention-days: 30

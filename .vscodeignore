@@ -8,7 +8,7 @@ scripts/**
 dist-tests/**
 node_modules/**
 docs/screenshots/**
-*.map
+**/*.map
 tsconfig.json
 esbuild.mjs
 .gitignore

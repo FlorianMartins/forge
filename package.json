@@ -348,9 +348,10 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node esbuild.mjs && node esbuild.mjs --tests && node --test dist-tests/",
-    "package": "npx --yes @vscode/vsce@2 package --no-dependencies -o hivey-forge.vsix",
+    "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-forge.vsix",
     "models": "node scripts/update-models.mjs",
-    "models:check": "node scripts/update-models.mjs --check"
+    "models:check": "node scripts/update-models.mjs --check",
+    "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
