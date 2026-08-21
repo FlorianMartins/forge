@@ -21,7 +21,24 @@ const common = {
   target: "node18",
 };
 
-const targets = tests
+const integration = process.argv.includes("--integration");
+
+const targets = integration
+  ? [
+      {
+        ...common,
+        // The integration runner and its suite are loaded by VS Code itself, so they are built as
+        // separate CommonJS files rather than bundled: `vscode` is provided by the host.
+        entryPoints: ["src/test/runTest.ts", "src/test/suite/index.ts", "src/test/suite/extension.test.ts"],
+        outdir: "dist-integration",
+        outbase: "src/test",
+        platform: "node",
+        format: "cjs",
+        external: ["vscode", "mocha", "@vscode/test-electron"],
+        sourcemap: false,
+      },
+    ]
+  : tests
   ? [
       {
         ...common,

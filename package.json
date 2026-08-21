@@ -114,12 +114,33 @@
         "command": "hiveyForge.explainTerminalSelection",
         "title": "Expliquer la sortie du terminal",
         "category": "Hivey Forge"
+      },
+      {
+        "command": "hiveyForge.openTerminal",
+        "title": "Ouvrir Forge dans le terminal",
+        "category": "Hivey Forge",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "hiveyForge.fixDiagnostic",
+        "title": "Corriger ce problème",
+        "category": "Hivey Forge"
+      },
+      {
+        "command": "hiveyForge.explainDiagnostic",
+        "title": "Expliquer ce problème",
+        "category": "Hivey Forge"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "hiveyForge.newSession",
+          "when": "view == hiveyForge.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "hiveyForge.openTerminal",
           "when": "view == hiveyForge.chat",
           "group": "navigation"
         }
@@ -147,6 +168,20 @@
         {
           "command": "hiveyForge.explainTerminalSelection",
           "group": "hivey@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "hiveyForge.fixDiagnostic",
+          "when": "false"
+        },
+        {
+          "command": "hiveyForge.explainDiagnostic",
+          "when": "false"
+        },
+        {
+          "command": "hiveyForge.askWith",
+          "when": "false"
         }
       ]
     },
@@ -351,12 +386,16 @@
     "package": "npx --yes @vscode/vsce@3 package --no-dependencies -o hivey-forge.vsix",
     "models": "node scripts/update-models.mjs",
     "models:check": "node scripts/update-models.mjs --check",
-    "scan:secrets": "node scripts/scan-secrets.mjs"
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "test:integration": "node esbuild.mjs --integration && node dist-integration/runTest.js"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
+    "mocha": "^10.8.2",
     "typescript": "^5.9.0"
   },
   "bin": {

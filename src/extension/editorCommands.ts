@@ -16,6 +16,7 @@ import { relative, type WorkspaceContext } from "./workspace.js";
 
 export interface EditorDeps {
   chat: ChatViewProvider;
+  extensionUri: vscode.Uri;
   keys: Keys;
   workspace: WorkspaceContext;
   log: vscode.OutputChannel;
@@ -89,6 +90,75 @@ export function registerEditorCommands(context: vscode.ExtensionContext, deps: E
         () => oneShot(deps, COMMIT_PROMPT, headToTokens(diff, 6000)),
       );
       if (message) repo.inputBox.value = stripFence(message).trim();
+    }),
+
+    // Quick fix on a diagnostic: the language server says what is wrong, so the model is asked a
+    // precise question instead of being told to find the bug.
+    vscode.commands.registerCommand("hiveyForge.fixDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
+      const editor = await vscode.window.showTextDocument(uri);
+      const doc = editor.document;
+      // Widen to whole lines with a little room around them: a fix rarely fits inside the squiggle.
+      const start = Math.max(0, diagnostic.range.start.line - 3);
+      const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 3);
+      const range = new vscode.Range(start, 0, end, doc.lineAt(end).text.length);
+      const original = doc.getText(range);
+
+      const replacement = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Hivey Forge : correction…", cancellable: true },
+        (_p, token) =>
+          oneShot(
+            deps,
+            INLINE_EDIT_PROMPT,
+            [
+              `Language: ${doc.languageId}`,
+              `The editor reports on line ${diagnostic.range.start.line + 1}: ${diagnostic.message}`,
+              "Instruction: fix exactly that problem and change nothing else.",
+              "",
+              "Fragment:",
+              original,
+            ].join("\n"),
+            token,
+          ),
+      );
+      if (!replacement) return;
+      await editor.edit((b) => b.replace(range, stripFence(replacement)));
+      void vscode.window.showInformationMessage("Correction appliquée — Ctrl+Z pour revenir.");
+    }),
+
+    vscode.commands.registerCommand("hiveyForge.explainDiagnostic", async (uri: vscode.Uri, diagnostic: vscode.Diagnostic) => {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      const start = Math.max(0, diagnostic.range.start.line - 5);
+      const end = Math.min(doc.lineCount - 1, diagnostic.range.end.line + 5);
+      await deps.chat.focusWithPrompt(`Explique ce problème et propose la correction : « ${diagnostic.message} »`, {
+        kind: "diagnostic",
+        label: `${relative(uri)}:${diagnostic.range.start.line + 1}`,
+        body: doc.getText(new vscode.Range(start, 0, end, doc.lineAt(end).text.length)),
+        untrusted: true,
+      });
+    }),
+
+    vscode.commands.registerCommand("hiveyForge.askWith", async (instruction: string) => {
+      await deps.chat.focusWithPrompt(instruction, deps.workspace.activeContext());
+    }),
+
+    // `forge` in the integrated terminal — the same assistant, where the work already is.
+    vscode.commands.registerCommand("hiveyForge.openTerminal", async () => {
+      const settings = readSettings();
+      const script = vscode.Uri.joinPath(deps.extensionUri, "dist", "forge.js").fsPath;
+      const existing = vscode.window.terminals.find((t) => t.name === "Forge");
+      const terminal =
+        existing ??
+        vscode.window.createTerminal({
+          name: "Forge",
+          // The terminal client reads its endpoint and model from the environment, so it starts on
+          // the same configuration as the sidebar instead of on its own defaults.
+          env: {
+            HIVEY_FORGE_URL: settings.endpoints[settings.chat.provider] ?? settings.endpoints.local,
+            HIVEY_FORGE_MODEL: settings.chat.model,
+          },
+        });
+      terminal.show();
+      terminal.sendText(`node "${script}"`, true);
     }),
 
     vscode.commands.registerCommand("hiveyForge.explainTerminalSelection", async () => {

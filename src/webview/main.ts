@@ -289,6 +289,45 @@ function codeBlock(code: string, lang: string): HTMLElement {
 
 // ── Composer ─────────────────────────────────────────────────────────────────────────────────
 
+// Slash commands. Each is a prompt someone would otherwise retype ten times a day; expanding them
+// in the panel keeps the model's instructions readable in the transcript instead of hiding them in
+// a system prompt nobody can see.
+const SLASH: Array<{ name: string; hint: string; prompt: string; attachActive?: boolean }> = [
+  {
+    name: "/expliquer",
+    hint: "expliquer le fichier ou la sélection",
+    prompt: "Explique ce code : ce qu'il fait, comment il s'inscrit dans le reste, et ce qui mérite attention.",
+    attachActive: true,
+  },
+  {
+    name: "/tests",
+    hint: "écrire des tests",
+    prompt: "Écris des tests pour ce code, dans le style et avec les outils déjà utilisés dans ce dépôt. Couvre les cas limites.",
+    attachActive: true,
+  },
+  {
+    name: "/corriger",
+    hint: "trouver et corriger le problème",
+    prompt: "Trouve le défaut de ce code et corrige-le. Explique en une phrase ce qui n'allait pas.",
+    attachActive: true,
+  },
+  {
+    name: "/revue",
+    hint: "revue : bugs, sécurité, lisibilité",
+    prompt:
+      "Fais la revue de ce code : bugs d'abord, puis sécurité, puis lisibilité. Ordonne par gravité, cite les lignes, ne signale rien dont tu ne sois pas sûr.",
+    attachActive: true,
+  },
+  { name: "/doc", hint: "documenter", prompt: "Documente ce code : une note au-dessus, dans la langue et le style du fichier.", attachActive: true },
+];
+
+function expandSlash(text: string): { text: string; attachActive: boolean } | undefined {
+  const match = SLASH.find((c) => text === c.name || text.startsWith(`${c.name} `));
+  if (!match) return undefined;
+  const extra = text.slice(match.name.length).trim();
+  return { text: extra ? `${match.prompt}\n\n${extra}` : match.prompt, attachActive: match.attachActive ?? false };
+}
+
 function composer(s: UiState): HTMLElement {
   const wrap = el("div", "composer");
 
@@ -303,7 +342,9 @@ function composer(s: UiState): HTMLElement {
   }
 
   const area = el("textarea");
-  area.placeholder = streaming ? "Réponse en cours…" : "Posez votre question. Entrée pour envoyer, Maj+Entrée pour un saut de ligne.";
+  area.placeholder = streaming
+    ? "Réponse en cours…"
+    : "Posez votre question. « # » joint un fichier, « / » lance une commande. Entrée pour envoyer.";
   area.rows = 3;
   area.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) {
@@ -311,7 +352,19 @@ function composer(s: UiState): HTMLElement {
       submit(area);
     }
   });
+  // `#` hands over to the editor's file picker: fuzzy matching and keyboard handling for free.
+  area.addEventListener("input", () => {
+    const value = area.value;
+    if (value.endsWith("#")) {
+      area.value = value.slice(0, -1);
+      send({ type: "attachMention", query: "" });
+    }
+    slashHints(hints, area);
+  });
   wrap.append(area);
+
+  const hints = el("div", "slash-hints");
+  wrap.append(hints);
 
   const row = el("div", "composer-row");
   const agent = el("label", "toggle");
@@ -340,10 +393,30 @@ function composer(s: UiState): HTMLElement {
   return wrap;
 }
 
+function slashHints(container: HTMLElement, area: HTMLTextAreaElement): void {
+  container.textContent = "";
+  const value = area.value;
+  if (!value.startsWith("/")) return;
+  for (const c of SLASH.filter((c) => c.name.startsWith(value.split(" ")[0] ?? "/"))) {
+    const chip = button(`${c.name} — ${c.hint}`, c.hint, () => {
+      area.value = `${c.name} `;
+      area.focus();
+      container.textContent = "";
+    }, "text");
+    container.append(chip);
+  }
+}
+
 function submit(area: HTMLTextAreaElement): void {
-  const text = area.value.trim();
+  let text = area.value.trim();
   if (!text || streaming) return;
   const editing = area.dataset["editing"];
+  const expanded = expandSlash(text);
+  if (expanded) {
+    text = expanded.text;
+    // The command's own context: the file being edited, added exactly as the 📎 button would.
+    if (expanded.attachActive) send({ type: "attachActive" });
+  }
   area.value = "";
   if (editing) {
     delete area.dataset["editing"];

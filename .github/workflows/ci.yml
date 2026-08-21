@@ -64,3 +64,17 @@ jobs:
             hivey-forge.vsix
             sbom.json
           retention-days: 30
+
+  integration:
+    # The only job that proves `activate()` works: it downloads a real VS Code, loads the extension
+    # into it headless, and checks that every command the manifest declares actually exists.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Extension host tests
+        run: xvfb-run -a npm run test:integration

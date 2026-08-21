@@ -13,18 +13,21 @@ Honnête plutôt que flatteur : ce qui marche, ce qui manque, ce qui n'est pas v
 - Commandes d'éditeur : `Ctrl+I`, interroger la sélection, message de commit, expliquer le terminal.
 - Client terminal `forge`, avec sortie de commande capturée et diff avant écriture.
 - Porte de sortie : globs interdits, anonymisation, refus sur secret, consentement, journal, budget.
-- CI : types, tests, auto-scan de secrets, `npm audit`, CodeQL, `.vsix`, SBOM, catalogue de prix
-  régénéré chaque jour.
+- Correctifs rapides sur les diagnostics de l'éditeur (« Corriger avec Hivey Forge »), commandes
+  `/` dans la barre latérale, mention `#` qui ouvre le sélecteur de fichiers de VS Code, et
+  lancement du client terminal depuis l'éditeur.
+- **Tests d'intégration dans un vrai VS Code** (7, headless) : l'extension s'active, toutes les
+  commandes déclarées sont enregistrées, les réglages ont les défauts annoncés, la complétion ne
+  lève rien quand aucun serveur ne répond, les rapports s'ouvrent, les correctifs apparaissent.
+- CI : types, tests, tests d'intégration, auto-scan de secrets, `npm audit`, CodeQL, `.vsix`, SBOM,
+  catalogue de prix régénéré chaque jour.
 
 ## Pas encore fait
 
 - **Publication** sur le Marketplace VS Code et Open VSX.
 - **Localisation.** L'interface est en français en dur ; il faut passer par `package.nls.json` et
   une table de chaînes (l'anglais d'abord).
-- **Vérification dans un vrai VS Code.** Le code est typé, construit et testé unitairement, mais
-  l'extension n'a pas encore été chargée dans un éditeur : la machine de développement n'a pas
-  d'affichage. C'est la première chose à faire.
-- **Génération réelle mesurée.** Les tests de protocole utilisent un serveur factice ; la qualité et
+- **Qualité de génération mesurée.** Les tests de protocole utilisent un serveur factice ; la qualité et
   la latence des complétions avec `qwen2.5-coder:7b` n'ont pas pu être mesurées ici (machine sans
   GPU, charge moyenne > 100).
 - **Symboles via le serveur de langage.** La carte du dépôt utilise des expressions régulières ;

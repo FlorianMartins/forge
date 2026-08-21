@@ -221,6 +221,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.sendState();
           break;
         }
+        // `#` in the composer opens the editor's own file picker rather than a home-made dropdown:
+        // it has fuzzy matching, recent files and keyboard handling that would take a week to copy.
+        case "attachMention": {
+          const files = await this.workspace.findFiles(m.query, 50);
+          const picked = await vscode.window.showQuickPick(files, {
+            placeHolder: "Quel fichier joindre ?",
+            matchOnDescription: true,
+          });
+          if (picked) {
+            const folder = vscode.workspace.workspaceFolders?.[0];
+            if (folder) {
+              const item = await this.workspace.fileContext(vscode.Uri.joinPath(folder.uri, picked), readSettings());
+              if (item) this.attachments.push(item);
+            }
+          }
+          this.sendState();
+          break;
+        }
         case "attachFile": {
           const picked = await vscode.window.showOpenDialog({ canSelectMany: true, openLabel: "Joindre" });
           for (const uri of picked ?? []) {

@@ -6,6 +6,11 @@ LiteLLM, Anthropic) — au choix, par rôle, et **anonymisé quand ça sort**.
 
 Open source (Apache-2.0), **zéro dépendance à l'exécution**, **zéro télémétrie**.
 
+![La barre latérale de Hivey Forge dans VS Code](docs/images/sidebar.png)
+
+*Capture réelle : l'extension chargée dans VS Code, une réponse rendue par le panneau. Seul le
+modèle qui répond est un serveur de test — le reste est le produit.*
+
 ---
 
 ## Pourquoi
@@ -31,6 +36,8 @@ ce qui sort est **anonymisé de façon réversible** avant de partir.
 | **Mode agent** | L'assistant lit le dépôt, cherche, consulte les **diagnostics de l'éditeur**, modifie des fichiers et propose des commandes — **une approbation par action**, diff avant écriture, tout dans la pile d'annulation. |
 | **Terminal** | La commande `forge` : le même noyau, en REPL, avec la sortie des commandes réellement capturée et un diff imprimé avant chaque écriture. |
 | **Dans l'éditeur** | `Ctrl+I` réécrit la sélection sur place · clic droit → interroger la sélection · message de commit rédigé depuis l'index · « expliquer la sortie du terminal ». |
+| **Correctifs rapides** | Sur une erreur signalée par votre serveur de langage : « Corriger avec Hivey Forge » et « Expliquer ce problème ». Le compilateur dit **quoi** et **où** ; le modèle n'a plus qu'à corriger — c'est ce qui rend un petit modèle local suffisant sur la majorité des cas. |
+| **Raccourcis de saisie** | `#` ouvre le sélecteur de fichiers de VS Code · `/expliquer`, `/tests`, `/corriger`, `/revue`, `/doc` joignent le fichier actif et posent la bonne question. |
 | **Contrôle du contexte** | Chaque échange peut être **rendu muet** (il reste affiché, il ne part plus), **épinglé** (il survit à la coupe), modifié ou supprimé. C'est le levier le plus direct sur la qualité **et** sur la facture. |
 | **Confidentialité** | Anonymisation réversible, fichiers interdits, consentement avant la première destination, **journal des envois** et **rapport de coûts**. |
 
@@ -158,14 +165,15 @@ décisions : [`docs/adr/`](docs/adr).
 ## Développement
 
 ```bash
-npm test          # construit les bundles, puis 95 tests (node:test)
+npm test               # construit les bundles, puis 95 tests (node:test)
+npm run test:integration   # charge l'extension dans un vrai VS Code (7 tests, headless)
 npm run typecheck
 npm run scan:secrets   # scanne ce dépôt avec les détecteurs de l'extension elle-même
 npm run models         # régénère le catalogue de prix depuis OpenRouter
 ```
 
-La CI enchaîne types, tests, auto-scan de secrets, `npm audit`, CodeQL, empaquetage du `.vsix` et
-SBOM. Le catalogue de prix est régénéré chaque jour par un job planifié : **aucune version ni aucun
+La CI enchaîne types, tests, tests d'intégration dans un VS Code réel, auto-scan de secrets,
+`npm audit`, CodeQL, empaquetage du `.vsix` et SBOM. Le catalogue de prix est régénéré chaque jour par un job planifié : **aucune version ni aucun
 prix n'est écrit à la main**.
 
 ## État

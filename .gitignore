@@ -6,3 +6,5 @@ media/webview.js.map
 *.vsix
 .vscode-test/
 .DS_Store
+dist-integration/
+.vscode-test/

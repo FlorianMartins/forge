@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { Budget } from "../core/router/budget.js";
 import { isLocalEndpoint } from "../core/redaction/index.js";
 import { ChatViewProvider, PreviewProvider } from "./chat.js";
+import { ForgeCodeActions } from "./codeActions.js";
 import { InlineCompletionProvider } from "./completion.js";
 import { Keys, endpointFor, providerFor, readSettings, SECTION } from "./config.js";
 import { EgressGate, WorkspaceSpendStore, safeHost } from "./egress.js";
@@ -132,7 +133,15 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  registerEditorCommands(context, { chat, keys, workspace, log });
+  registerEditorCommands(context, { chat, keys, workspace, log, extensionUri: context.extensionUri });
+
+  // Quick fixes are registered for every file: the diagnostics come from whichever language server
+  // the user already has, so there is no list of supported languages to keep up to date.
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider({ pattern: "**" }, new ForgeCodeActions(), {
+      providedCodeActionKinds: ForgeCodeActions.kinds,
+    }),
+  );
 
   // Tell the user, once, where their data is going. An assistant that is quiet about this is
   // asking to be uninstalled by a security team.

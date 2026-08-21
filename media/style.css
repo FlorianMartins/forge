@@ -236,3 +236,7 @@ pre.code {
 .chip-x { padding: 0 0.1rem; font-size: 0.7rem; line-height: 1; }
 
 .empty { color: var(--vscode-descriptionForeground); font-style: italic; padding: 0.5rem; }
+
+/* Slash-command hints: a row that appears only while the user is typing a command. */
+.slash-hints { display: flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; margin-top: 0.25rem; }
+.slash-hints button { font-size: 0.75rem; color: var(--vscode-descriptionForeground); }

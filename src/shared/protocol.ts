@@ -59,6 +59,7 @@ export type ToExtension =
   | { type: "pickModel" }
   | { type: "attachActive" }
   | { type: "attachFile" }
+  | { type: "attachMention"; query: string }
   | { type: "removeAttachment"; label: string }
   | { type: "openEgress" }
   | { type: "approve"; id: string; approved: boolean }
